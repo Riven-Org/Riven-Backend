@@ -1,0 +1,50 @@
+[project]
+name = "riven"
+version = "0.1.0"
+description = "Riven — independent verification and institutional memory for AI-built software"
+requires-python = ">=3.12"
+dependencies = []
+
+[tool.uv.workspace]
+members = ["apps/api", "apps/worker", "packages/schemas"]
+
+[tool.uv.sources]
+riven-schemas = { workspace = true }
+riven-api = { workspace = true }
+riven-worker = { workspace = true }
+
+[dependency-groups]
+dev = [
+    "riven-schemas",
+    "riven-api",
+    "riven-worker",
+    "ruff>=0.6",
+    "mypy>=1.11",
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "pre-commit>=3.8",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM", "ASYNC"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["riven_api", "riven_worker", "riven_schemas"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+plugins = ["pydantic.mypy"]
+exclude = ["alembic/"]
+
+[[tool.mypy.overrides]]
+module = ["temporalio.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["apps/api/tests", "apps/worker/tests", "packages/schemas/tests"]
