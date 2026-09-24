@@ -73,6 +73,12 @@ Decisions and reasons: `docs/adr/0001-tech-stack.md`. New significant decisions 
 
 **Cost** — the org is on free plans (GitHub Free, ClickUp Free Forever). Choose self-hosted/open-source options; never add a paid service, licensed GitHub Action, or larger runner. If a ticket's suggested tech is paid, use the free alternative and say so in the PR.
 
+## Guardrails (enforced)
+
+`.claude/hooks/guard.py` runs before every shell command and file edit and blocks: force push (`-f`, `--force`, `--force-with-lease`, `+refspec`), pushing to or deleting `main`, `--no-verify`, `git reset --hard`, `gh pr merge --admin`, changing repo visibility, deleting/archiving repos, Codespaces, changing branch protection or rulesets, editing `docs/tickets/`, and in workflows any licensed action (e.g. `gitleaks/gitleaks-action`) or non-standard (paid, larger) runner. `.claude/settings.json` also denies reading `.env` and always asks the user before `git push` and `gh pr merge`. If a guard blocks something the task genuinely needs, stop and ask the user; never work around it.
+
+The guard matches the whole command text, so a commit message or heredoc that merely mentions a blocked flag is also blocked; put such text in a file (`git commit -F <file>`).
+
 ## Implementing a ticket
 
 Ticket details live in `docs/tickets/`: `INDEX.md` lists every epic and story; `<story-id>.md` holds its description, acceptance criteria, dependencies, tech notes and tasks. A task ID like `S01.2.3` is inside `S01.2.md`. Each task is labelled **Repo: backend / frontend / both**.
