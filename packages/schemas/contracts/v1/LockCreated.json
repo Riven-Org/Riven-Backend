@@ -37,6 +37,7 @@
       "type": "object"
     }
   },
+  "description": "A fixed bug now has a regression lock guarding it.",
   "properties": {
     "bug_id": {
       "title": "Bug Id",

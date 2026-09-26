@@ -39,7 +39,7 @@ jobs:
       - run: uv sync --frozen
       - run: uv run ruff check .
       - run: uv run ruff format --check .
-      - run: uv run mypy apps/api/src apps/worker/src packages/schemas/src packages/events/src
+      - run: uv run mypy apps/api/src apps/worker/src packages/schemas/src packages/events/src packages/db/src packages/storage/src
       - run: uv run pytest
       - name: Export contracts as JSON Schema
         run: uv run python -m riven_schemas.export build/json-schema

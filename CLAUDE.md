@@ -48,9 +48,9 @@ Docker is not installed on the maintainer's machine; `make up` may be unavailabl
 
 ## Architecture and conventions
 
-Decisions and reasons: `docs/adr/` (0001 stack, 0002 service decomposition and data ownership, 0003–0010 one per service). New significant decisions get a new numbered ADR in the same PR.
+Decisions and reasons: `docs/adr/` (0001 stack, 0002 service decomposition and data ownership, 0003–0010 one per service, 0011 shared persistence package and object storage). New significant decisions get a new numbered ADR in the same PR.
 
-**Workspace** (uv): `apps/api` (`riven_api`), `apps/worker` (`riven_worker`), `packages/schemas` (`riven_schemas`), `packages/events` (`riven_events`). mypy strict covers every `src/` tree; ruff treats the packages as first-party.
+**Workspace** (uv): `apps/api` (`riven_api`), `apps/worker` (`riven_worker`), `packages/schemas` (`riven_schemas`), `packages/events` (`riven_events`), `packages/db` (`riven_db`), `packages/storage` (`riven_storage`). mypy strict covers every `src/` tree; ruff treats the packages as first-party.
 
 **Events** (`riven_events`, S01.3) — publish a domain event with `add_event(session, event, org_id=...)` inside the same transaction as the state change; never write to Redis directly. `make relay` runs the outbox relay (→ Redis Stream `riven:events`). Consume with `EventConsumer(name, sessions, redis, {"<type>": handler})`: the handler runs in the transaction that records the event as processed, so do all side effects through that session. New events: add to `EVENTS` and `catalog.ROUTES`, then `make catalog` (the catalog test fails otherwise). Catalog: `docs/events.md`.
 
@@ -59,8 +59,9 @@ Decisions and reasons: `docs/adr/` (0001 stack, 0002 service decomposition and d
 **`apps/api`** — build new features in this shape:
 - `routers/<resource>.py`: thin HTTP layer, mounted under `/v1` (health stays unversioned). Declare the required permission on every mutating endpoint once RBAC (S03.3) exists.
 - `services/<area>.py`: business logic; routers call services, services take an `AsyncSession`.
-- `models/<area>.py`: SQLAlchemy 2.0 typed models. Every domain table uses `TenantMixin` (indexed `org_id`); queries are always org-scoped. Import new model modules in `alembic/env.py` so autogenerate sees them.
-- Every schema change is an Alembic migration named `<ID>: …`; never edit an applied migration.
+- Models: SQLAlchemy 2.0 typed models live in `packages/db` (`riven_db.models.<owning service>`, ADR 0011) because worker services own tables too. Every domain table uses `TenantMixin` (non-null indexed `org_id`); queries are always org-scoped. Export new model modules from `riven_db/models/__init__.py` so autogenerate and the drift test see them.
+- Every schema change is an Alembic migration named `<ID>: …`; never edit an applied migration. `packages/db/tests/test_migrations.py` fails when models and migrations drift.
+- Logs and artifacts go to object storage through `riven_storage.ObjectStore` (MinIO locally, S3 in the cloud), downloaded via presigned URLs; services never write to local disk (a test enforces it).
 - Tests use `create_app()` + `app.dependency_overrides[get_session]`; no test may require a live external service unless CI provides it. CI provides Postgres (pgvector) and Redis: tests using the root `conftest.py` fixtures (`sessions`, `db_engine`, `redis`) run against a migrated database when `RIVEN_TEST_DATABASE_URL` is set and are skipped otherwise; `redis` falls back to fakeredis.
 
 **`apps/worker`** — pipeline logic lives in activities; `VerificationWorkflow` only orchestrates. Workflow code must stay deterministic (no I/O, clock, randomness; imports of app code inside `workflow.unsafe.imports_passed_through()`). Register new activities in `ALL_ACTIVITIES` with an explicit timeout and `STAGE_RETRY`. Client and worker must both use `pydantic_data_converter`. `workflow_id_for()` is the idempotency key per (org, repo, commit) — keep it stable.

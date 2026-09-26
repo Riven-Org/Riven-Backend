@@ -3,6 +3,7 @@ idempotent consumers. Needs Postgres (RIVEN_TEST_DATABASE_URL); Redis may be fak
 
 import asyncio
 import time
+from collections.abc import AsyncIterator
 from typing import Any
 
 import pytest
@@ -20,12 +21,17 @@ def _bug_event(bug_id: str = "bug_1") -> BugConfirmed:
     return BugConfirmed(change=CHANGE, bug_id=bug_id, fingerprint=f"fp-{bug_id}")
 
 
-async def _create_demo_tables(sessions: async_sessionmaker[AsyncSession]) -> None:
+@pytest.fixture(autouse=True)
+async def demo_tables(sessions: async_sessionmaker[AsyncSession]) -> AsyncIterator[None]:
+    """Stand-in state tables for these tests only; dropped so they never leak into the schema."""
     async with sessions() as session, session.begin():
-        await session.execute(text("CREATE TABLE IF NOT EXISTS demo_bugs (id text PRIMARY KEY)"))
+        await session.execute(text("CREATE TABLE demo_bugs (id text PRIMARY KEY)"))
         await session.execute(
-            text("CREATE TABLE IF NOT EXISTS demo_effects (id serial PRIMARY KEY, bug_id text)")
+            text("CREATE TABLE demo_effects (id serial PRIMARY KEY, bug_id text)")
         )
+    yield
+    async with sessions() as session, session.begin():
+        await session.execute(text("DROP TABLE demo_bugs, demo_effects"))
 
 
 async def _confirm_bug(sessions: async_sessionmaker[AsyncSession], event: BugConfirmed) -> None:
@@ -79,7 +85,6 @@ class FlakyRedis:
 async def test_event_is_stored_in_the_same_transaction_as_the_state_change(
     sessions: async_sessionmaker[AsyncSession],
 ) -> None:
-    await _create_demo_tables(sessions)
 
     await _confirm_bug(sessions, _bug_event())
 
@@ -90,7 +95,6 @@ async def test_event_is_stored_in_the_same_transaction_as_the_state_change(
 async def test_event_is_discarded_when_the_state_change_rolls_back(
     sessions: async_sessionmaker[AsyncSession],
 ) -> None:
-    await _create_demo_tables(sessions)
 
     with pytest.raises(RuntimeError):
         async with sessions() as session, session.begin():
@@ -109,7 +113,6 @@ async def test_event_is_discarded_when_the_state_change_rolls_back(
 async def test_relay_publishes_a_committed_event_within_two_seconds(
     sessions: async_sessionmaker[AsyncSession], redis: Redis
 ) -> None:
-    await _create_demo_tables(sessions)
     stop = asyncio.Event()
     relay_task = asyncio.create_task(OutboxRelay(sessions, redis).run(poll_seconds=0.5, stop=stop))
     await asyncio.sleep(0.1)  # relay is idle, waiting for work
@@ -131,7 +134,6 @@ async def test_relay_publishes_a_committed_event_within_two_seconds(
 async def test_relay_restart_after_a_crash_loses_no_event(
     sessions: async_sessionmaker[AsyncSession], redis: Redis
 ) -> None:
-    await _create_demo_tables(sessions)
     events = [_bug_event(f"bug_{i}") for i in range(3)]
     for event in events:
         await _confirm_bug(sessions, event)
@@ -160,7 +162,6 @@ async def test_relay_restart_after_a_crash_loses_no_event(
 async def test_replaying_the_stream_causes_no_duplicate_side_effects(
     sessions: async_sessionmaker[AsyncSession], redis: Redis
 ) -> None:
-    await _create_demo_tables(sessions)
     for i in range(2):
         await _confirm_bug(sessions, _bug_event(f"bug_{i}"))
     await OutboxRelay(sessions, redis).relay_once()
@@ -179,7 +180,6 @@ async def test_replaying_the_stream_causes_no_duplicate_side_effects(
 async def test_crash_before_ack_redelivers_without_a_second_side_effect(
     sessions: async_sessionmaker[AsyncSession], redis: Redis
 ) -> None:
-    await _create_demo_tables(sessions)
     await _confirm_bug(sessions, _bug_event())
     await OutboxRelay(sessions, redis).relay_once()
 
@@ -213,7 +213,6 @@ async def test_crash_before_ack_redelivers_without_a_second_side_effect(
 async def test_failed_handler_leaves_no_trace_and_the_event_is_retried(
     sessions: async_sessionmaker[AsyncSession], redis: Redis
 ) -> None:
-    await _create_demo_tables(sessions)
     await _confirm_bug(sessions, _bug_event())
     await OutboxRelay(sessions, redis).relay_once()
 
@@ -236,7 +235,6 @@ async def test_failed_handler_leaves_no_trace_and_the_event_is_retried(
 async def test_events_without_a_handler_are_acknowledged_and_skipped(
     sessions: async_sessionmaker[AsyncSession], redis: Redis
 ) -> None:
-    await _create_demo_tables(sessions)
     await _confirm_bug(sessions, _bug_event())
     await OutboxRelay(sessions, redis).relay_once()
 

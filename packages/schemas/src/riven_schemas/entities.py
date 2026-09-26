@@ -113,3 +113,11 @@ class GraphEdge(BaseModel):
     created_by: str
     valid_from: datetime
     valid_to: datetime | None = None
+
+
+class GraphConsistencyReport(BaseModel):
+    """Result of the nightly graph consistency check (S01.4.4)."""
+
+    checked_edges: int
+    orphaned_edges: int
+    checked_at: datetime

@@ -5,8 +5,9 @@ import asyncio
 from alembic import context
 from sqlalchemy.ext.asyncio import create_async_engine
 
+import riven_db.models  # noqa: F401  (registers every model on Base.metadata)
 from riven_api.config import get_settings
-from riven_api.db import Base
+from riven_db import Base
 from riven_events import EventsBase
 
 target_metadata = [Base.metadata, EventsBase.metadata]

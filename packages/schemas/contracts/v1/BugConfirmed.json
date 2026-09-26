@@ -37,6 +37,7 @@
       "type": "object"
     }
   },
+  "description": "A failure was confirmed as a bug and stored in bug memory.",
   "properties": {
     "bug_id": {
       "title": "Bug Id",

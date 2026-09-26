@@ -46,6 +46,7 @@
       "type": "string"
     }
   },
+  "description": "A verification run finished with a verdict from an independent verifier.",
   "properties": {
     "change": {
       "$ref": "#/$defs/ChangeRef"

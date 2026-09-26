@@ -6,6 +6,8 @@ requires-python = ">=3.12"
 dependencies = [
     "riven-schemas",
     "riven-events",
+    "riven-db",
+    "riven-storage",
     "temporalio>=1.7",
     "pydantic-settings>=2.4",
 ]

@@ -12,6 +12,7 @@ from riven_schemas.domain import ChangeRef, Producer
 from riven_schemas.entities import (
     Bug,
     Change,
+    GraphConsistencyReport,
     GraphEdge,
     GraphNode,
     RegressionLock,
@@ -47,6 +48,7 @@ _MODELS: tuple[type[BaseModel], ...] = (
     RegressionLock,
     GraphNode,
     GraphEdge,
+    GraphConsistencyReport,
     *EVENTS,
 )
 

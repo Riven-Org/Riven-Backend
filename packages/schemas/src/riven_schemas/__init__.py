@@ -19,6 +19,7 @@ from riven_schemas.domain import (
 from riven_schemas.entities import (
     Bug,
     Change,
+    GraphConsistencyReport,
     GraphEdge,
     GraphNode,
     RegressionLock,
@@ -46,6 +47,7 @@ __all__ = [
     "ChangeCaptured",
     "ChangeRef",
     "DomainEvent",
+    "GraphConsistencyReport",
     "GraphEdge",
     "GraphNode",
     "LockCreated",
