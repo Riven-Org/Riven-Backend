@@ -40,6 +40,40 @@ class BugState(StrEnum):
     REOPENED = "reopened"
 
 
+class RunState(StrEnum):
+    """Lifecycle of one verification run (orchestrator)."""
+
+    QUEUED = "queued"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    CANCELLED = "cancelled"
+
+
+class Severity(StrEnum):
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+    CRITICAL = "critical"
+
+
+class LockStatus(StrEnum):
+    ACTIVE = "active"
+    RETIRED = "retired"
+
+
+class NodeKind(StrEnum):
+    """Causal graph node kinds (ticket S09.1)."""
+
+    REQUIREMENT = "requirement"
+    CHANGE = "change"
+    MODULE = "module"
+    SYMBOL = "symbol"
+    BUG = "bug"
+    FIX = "fix"
+    TEST = "test"
+    DECISION = "decision"
+
+
 class Producer(BaseModel):
     model_config = ConfigDict(frozen=True)
 

@@ -1,4 +1,20 @@
-# Local development services (ticket S02.1). Start with `make up`.
+# Full local stack (ticket S02.1). Start everything with `make dev`.
+x-riven-env: &riven-env
+  RIVEN_ENV: dev
+  RIVEN_DATABASE_URL: postgresql+asyncpg://riven:riven@postgres:5432/riven
+  RIVEN_REDIS_URL: redis://redis:6379/0
+  RIVEN_TEMPORAL_ADDRESS: temporal:7233
+  RIVEN_S3_ENDPOINT_URL: http://minio:9000
+  RIVEN_S3_BUCKET: riven-artifacts
+  RIVEN_S3_ACCESS_KEY: riven
+  RIVEN_S3_SECRET_KEY: riven-dev-secret
+
+x-riven-app: &riven-app
+  build: .
+  image: riven-backend:dev
+  environment: *riven-env
+  restart: unless-stopped
+
 services:
   postgres:
     image: pgvector/pgvector:pg16
@@ -9,26 +25,42 @@ services:
     ports: ["5432:5432"]
     volumes: [pgdata:/var/lib/postgresql/data]
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U riven"]
+      test: ["CMD-SHELL", "pg_isready -U riven -d riven"]
       interval: 5s
-      retries: 10
+      retries: 20
 
   redis:
     image: redis:7-alpine
     ports: ["6379:6379"]
+    volumes: [redisdata:/data]
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
-      retries: 10
+      retries: 20
 
   minio:
-    image: minio/minio:latest
+    image: minio/minio:RELEASE.2025-04-22T22-12-26Z
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: riven
       MINIO_ROOT_PASSWORD: riven-dev-secret
     ports: ["9000:9000", "9001:9001"]
     volumes: [miniodata:/data]
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      retries: 20
+
+  # One-shot: create the artifacts bucket.
+  minio-init:
+    image: minio/mc:RELEASE.2025-04-16T18-13-26Z
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >-
+      sh -c "mc alias set local http://minio:9000 riven riven-dev-secret &&
+             mc mb --ignore-existing local/riven-artifacts"
+    profiles: [init]
 
   # Temporal stores its own state in the same Postgres (separate databases).
   temporal:
@@ -43,14 +75,67 @@ services:
       POSTGRES_PWD: riven
       POSTGRES_SEEDS: postgres
     ports: ["7233:7233"]
+    healthcheck:
+      test: ["CMD-SHELL", "tctl --address $$(hostname -i):7233 cluster health | grep -q SERVING"]
+      interval: 5s
+      retries: 40
+      start_period: 20s
 
   temporal-ui:
     image: temporalio/ui:2.26.2
-    depends_on: [temporal]
+    depends_on:
+      temporal:
+        condition: service_healthy
     environment:
       TEMPORAL_ADDRESS: temporal:7233
     ports: ["8080:8080"]
 
+  # One-shot: apply migrations (make dev runs it before the app services start).
+  migrate:
+    <<: *riven-app
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: ["alembic", "-c", "apps/api/alembic.ini", "upgrade", "head"]
+    profiles: [init]
+
+  api:
+    <<: *riven-app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports: ["8000:8000"]
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/ready')"
+      interval: 5s
+      retries: 20
+
+  worker:
+    <<: *riven-app
+    depends_on:
+      temporal:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    command: ["python", "-m", "riven_worker.main"]
+
+  relay:
+    <<: *riven-app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: ["python", "-m", "riven_events.relay"]
+
 volumes:
   pgdata:
+  redisdata:
   miniodata:

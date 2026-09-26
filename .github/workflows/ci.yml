@@ -12,6 +12,24 @@ concurrency:
 jobs:
   python:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: riven
+          POSTGRES_PASSWORD: riven
+          POSTGRES_DB: riven_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U riven" --health-interval 5s --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping" --health-interval 5s --health-retries 10
+    env:
+      RIVEN_TEST_DATABASE_URL: postgresql+asyncpg://riven:riven@localhost:5432/riven_test
+      RIVEN_TEST_REDIS_URL: redis://localhost:6379/15
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v3
@@ -21,8 +39,35 @@ jobs:
       - run: uv sync --frozen
       - run: uv run ruff check .
       - run: uv run ruff format --check .
-      - run: uv run mypy apps/api/src apps/worker/src packages/schemas/src
+      - run: uv run mypy apps/api/src apps/worker/src packages/schemas/src packages/events/src packages/db/src packages/storage/src
       - run: uv run pytest
+      - name: Export contracts as JSON Schema
+        run: uv run python -m riven_schemas.export build/json-schema
+      - uses: actions/upload-artifact@v4
+        with:
+          name: json-schema
+          path: build/json-schema
+
+  # Brings up the whole local stack exactly as `make dev` does and checks it is healthy.
+  stack:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: make dev
+        run: make dev
+      - name: Every container is running or healthy
+        run: |
+          docker compose ps
+          test -z "$(docker compose ps --format '{{.Name}} {{.Health}}' | grep -E 'unhealthy|starting')"
+          test "$(docker compose ps --services --status running | wc -l)" -ge 8
+      - name: API is ready and demo data is loaded
+        run: |
+          curl -fsS http://localhost:8000/health/ready
+          test "$(docker compose exec -T postgres psql -U riven -tAc 'select count(*) from changes')" = 5
+          docker compose run --rm api python -m riven_db.seed | grep -q "already present"
+      - name: Logs on failure
+        if: failure()
+        run: docker compose logs --no-color --tail 200
 
   secrets:
     runs-on: ubuntu-latest

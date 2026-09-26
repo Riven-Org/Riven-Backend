@@ -38,28 +38,33 @@ make check                               # = CI: ruff check, ruff format --check
 uv run pytest apps/api/tests/test_health.py::test_health_returns_ok    # single test
 uv run pytest -k workflow                # by keyword
 make fmt                                 # auto-fix lint + format
-make up && make migrate                  # Postgres(pgvector)/Redis/MinIO/Temporal, then Alembic
+make dev                                 # whole stack in Docker + migrations + demo seed (CI job `stack` runs it)
+make up && make migrate                  # infra only (Postgres(pgvector)/Redis/MinIO/Temporal), then Alembic
+make seed                                # demo org `demo` / repo `riven-demo/shop` (idempotent)
 make api                                 # :8000, OpenAPI docs at /docs
 make worker                              # Temporal worker, task queue "verification"
 uv run alembic -c apps/api/alembic.ini revision --autogenerate -m "<ID>: <what>"
 ```
 
-Docker is not installed on the maintainer's machine; `make up` may be unavailable locally. Anything needing Postgres/Temporal must also work in CI (add a `services:` container to `.github/workflows/ci.yml` in the ticket that first needs it — GitHub-hosted service containers are free for public repos).
+Docker is not installed on the maintainer's machine; `make up`/`make dev` may be unavailable locally. Anything needing Postgres/Temporal must also work in CI: the `python` job has Postgres (pgvector) and Redis service containers, and the `stack` job runs `make dev` and checks every container is healthy. New services go in `docker-compose.yml` (one `Dockerfile` image serves every Python service).
 
 ## Architecture and conventions
 
-Decisions and reasons: `docs/adr/0001-tech-stack.md`. New significant decisions get a new numbered ADR in the same PR.
+Decisions and reasons: `docs/adr/` (0001 stack, 0002 service decomposition and data ownership, 0003–0010 one per service, 0011 shared persistence package and object storage). New significant decisions get a new numbered ADR in the same PR.
 
-**Workspace** (uv): `apps/api` (`riven_api`), `apps/worker` (`riven_worker`), `packages/schemas` (`riven_schemas`). mypy strict covers all three `src/` trees; ruff treats the three packages as first-party.
+**Workspace** (uv): `apps/api` (`riven_api`), `apps/worker` (`riven_worker`), `packages/schemas` (`riven_schemas`), `packages/events` (`riven_events`), `packages/db` (`riven_db`), `packages/storage` (`riven_storage`). mypy strict covers every `src/` tree; ruff treats the packages as first-party.
 
-**`packages/schemas`** — every payload that crosses a service boundary (API ↔ worker, events, Temporal inputs/outputs). Never define such a model inside one app. Events subclass `DomainEvent` with a `type: Literal["noun.verb"]`; additive changes keep `schema_version`, breaking changes bump it and add a contract test.
+**Events** (`riven_events`, S01.3) — publish a domain event with `add_event(session, event, org_id=...)` inside the same transaction as the state change; never write to Redis directly. `make relay` runs the outbox relay (→ Redis Stream `riven:events`). Consume with `EventConsumer(name, sessions, redis, {"<type>": handler})`: the handler runs in the transaction that records the event as processed, so do all side effects through that session. New events: add to `EVENTS` and `catalog.ROUTES`, then `make catalog` (the catalog test fails otherwise). Catalog: `docs/events.md`.
+
+**`packages/schemas`** — every payload that crosses a service boundary (API ↔ worker, events, Temporal inputs/outputs). Never define such a model inside one app. Events subclass `DomainEvent` with a `type: Literal["noun.verb"]`. Register every contract in `contracts.py`; `test_contracts.py` compares it with the committed baseline in `packages/schemas/contracts/v<SCHEMA_VERSION>/`. Additive changes pass; a breaking change fails CI until you bump `SCHEMA_VERSION` and write a new baseline (`uv run python -m riven_schemas.export --snapshot`). Service boundaries and table ownership: ADRs 0002–0010.
 
 **`apps/api`** — build new features in this shape:
 - `routers/<resource>.py`: thin HTTP layer, mounted under `/v1` (health stays unversioned). Declare the required permission on every mutating endpoint once RBAC (S03.3) exists.
 - `services/<area>.py`: business logic; routers call services, services take an `AsyncSession`.
-- `models/<area>.py`: SQLAlchemy 2.0 typed models. Every domain table uses `TenantMixin` (indexed `org_id`); queries are always org-scoped. Import new model modules in `alembic/env.py` so autogenerate sees them.
-- Every schema change is an Alembic migration named `<ID>: …`; never edit an applied migration.
-- Tests use `create_app()` + `app.dependency_overrides[get_session]`; no test may require a live external service unless CI provides it.
+- Models: SQLAlchemy 2.0 typed models live in `packages/db` (`riven_db.models.<owning service>`, ADR 0011) because worker services own tables too. Every domain table uses `TenantMixin` (non-null indexed `org_id`); queries are always org-scoped. Export new model modules from `riven_db/models/__init__.py` so autogenerate and the drift test see them.
+- Every schema change is an Alembic migration named `<ID>: …`; never edit an applied migration. `packages/db/tests/test_migrations.py` fails when models and migrations drift.
+- Logs and artifacts go to object storage through `riven_storage.ObjectStore` (MinIO locally, S3 in the cloud), downloaded via presigned URLs; services never write to local disk (a test enforces it).
+- Tests use `create_app()` + `app.dependency_overrides[get_session]`; no test may require a live external service unless CI provides it. CI provides Postgres (pgvector) and Redis: tests using the root `conftest.py` fixtures (`sessions`, `db_engine`, `redis`) run against a migrated database when `RIVEN_TEST_DATABASE_URL` is set and are skipped otherwise; `redis` falls back to fakeredis.
 
 **`apps/worker`** — pipeline logic lives in activities; `VerificationWorkflow` only orchestrates. Workflow code must stay deterministic (no I/O, clock, randomness; imports of app code inside `workflow.unsafe.imports_passed_through()`). Register new activities in `ALL_ACTIVITIES` with an explicit timeout and `STAGE_RETRY`. Client and worker must both use `pydantic_data_converter`. `workflow_id_for()` is the idempotency key per (org, repo, commit) — keep it stable.
 

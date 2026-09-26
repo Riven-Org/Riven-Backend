@@ -1,0 +1,68 @@
+{
+  "$defs": {
+    "StageResult": {
+      "description": "Outcome of one pipeline stage (Temporal activity result).",
+      "properties": {
+        "detail": {
+          "default": "",
+          "title": "Detail",
+          "type": "string"
+        },
+        "ok": {
+          "title": "Ok",
+          "type": "boolean"
+        },
+        "stage": {
+          "$ref": "#/$defs/VerificationStage"
+        }
+      },
+      "required": [
+        "stage",
+        "ok"
+      ],
+      "title": "StageResult",
+      "type": "object"
+    },
+    "VerificationStage": {
+      "description": "Pipeline stages, in order (MVP flow).",
+      "enum": [
+        "capture",
+        "analyze",
+        "sandbox",
+        "verify",
+        "memory",
+        "graph"
+      ],
+      "title": "VerificationStage",
+      "type": "string"
+    },
+    "VerificationStatus": {
+      "enum": [
+        "passed",
+        "failed",
+        "needs_review"
+      ],
+      "title": "VerificationStatus",
+      "type": "string"
+    }
+  },
+  "description": "Result of a whole verification workflow run.",
+  "properties": {
+    "stages": {
+      "items": {
+        "$ref": "#/$defs/StageResult"
+      },
+      "title": "Stages",
+      "type": "array"
+    },
+    "status": {
+      "$ref": "#/$defs/VerificationStatus"
+    }
+  },
+  "required": [
+    "status",
+    "stages"
+  ],
+  "title": "VerdictResult",
+  "type": "object"
+}
