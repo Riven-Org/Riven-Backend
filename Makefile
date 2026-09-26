@@ -1,13 +1,25 @@
-.PHONY: install up down api worker relay migrate test lint fmt typecheck check schemas catalog
+.PHONY: install dev seed up down api worker relay migrate test lint fmt typecheck check schemas catalog
 
 install:        ## Install dependencies and git hooks
 	uv sync
 	uv run pre-commit install
 
-up:             ## Start Postgres, Redis, MinIO, Temporal
-	docker compose up -d
+dev:            ## Whole stack in Docker: infra, migrations, API, worker, relay, demo data
+	docker compose up -d --wait postgres redis minio temporal
+	docker compose --profile init run --rm minio-init
+	docker compose --profile init run --rm --build migrate
+	docker compose up -d --wait api worker relay temporal-ui
+	docker compose run --rm api python -m riven_db.seed
+	@echo "API http://localhost:8000/docs · Temporal UI http://localhost:8080 · MinIO http://localhost:9001"
 
-down:
+seed:           ## Load the demo org into the database from .env (idempotent)
+	uv run python -m riven_db.seed
+
+up:             ## Start only the infrastructure (Postgres, Redis, MinIO, Temporal) for local runs
+	docker compose up -d --wait postgres redis minio temporal
+	docker compose --profile init run --rm minio-init
+
+down:           ## Stop the stack (data volumes are kept; `docker compose down -v` wipes them)
 	docker compose down
 
 api:            ## Run the API on :8000 with reload

@@ -38,13 +38,15 @@ make check                               # = CI: ruff check, ruff format --check
 uv run pytest apps/api/tests/test_health.py::test_health_returns_ok    # single test
 uv run pytest -k workflow                # by keyword
 make fmt                                 # auto-fix lint + format
-make up && make migrate                  # Postgres(pgvector)/Redis/MinIO/Temporal, then Alembic
+make dev                                 # whole stack in Docker + migrations + demo seed (CI job `stack` runs it)
+make up && make migrate                  # infra only (Postgres(pgvector)/Redis/MinIO/Temporal), then Alembic
+make seed                                # demo org `demo` / repo `riven-demo/shop` (idempotent)
 make api                                 # :8000, OpenAPI docs at /docs
 make worker                              # Temporal worker, task queue "verification"
 uv run alembic -c apps/api/alembic.ini revision --autogenerate -m "<ID>: <what>"
 ```
 
-Docker is not installed on the maintainer's machine; `make up` may be unavailable locally. Anything needing Postgres/Temporal must also work in CI (add a `services:` container to `.github/workflows/ci.yml` in the ticket that first needs it — GitHub-hosted service containers are free for public repos).
+Docker is not installed on the maintainer's machine; `make up`/`make dev` may be unavailable locally. Anything needing Postgres/Temporal must also work in CI: the `python` job has Postgres (pgvector) and Redis service containers, and the `stack` job runs `make dev` and checks every container is healthy. New services go in `docker-compose.yml` (one `Dockerfile` image serves every Python service).
 
 ## Architecture and conventions
 

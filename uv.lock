@@ -1438,6 +1438,7 @@ version = "0.1.0"
 source = { editable = "packages/db" }
 dependencies = [
     { name = "asyncpg" },
+    { name = "pydantic-settings" },
     { name = "riven-schemas" },
     { name = "sqlalchemy", extra = ["asyncio"] },
 ]
@@ -1445,6 +1446,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "asyncpg", specifier = ">=0.29" },
+    { name = "pydantic-settings", specifier = ">=2.4" },
     { name = "riven-schemas", editable = "packages/schemas" },
     { name = "sqlalchemy", extras = ["asyncio"], specifier = ">=2.0" },
 ]

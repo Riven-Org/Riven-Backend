@@ -48,6 +48,27 @@ jobs:
           name: json-schema
           path: build/json-schema
 
+  # Brings up the whole local stack exactly as `make dev` does and checks it is healthy.
+  stack:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: make dev
+        run: make dev
+      - name: Every container is running or healthy
+        run: |
+          docker compose ps
+          test -z "$(docker compose ps --format '{{.Name}} {{.Health}}' | grep -E 'unhealthy|starting')"
+          test "$(docker compose ps --services --status running | wc -l)" -ge 8
+      - name: API is ready and demo data is loaded
+        run: |
+          curl -fsS http://localhost:8000/health/ready
+          test "$(docker compose exec -T postgres psql -U riven -tAc 'select count(*) from changes')" = 5
+          docker compose run --rm api python -m riven_db.seed | grep -q "already present"
+      - name: Logs on failure
+        if: failure()
+        run: docker compose logs --no-color --tail 200
+
   secrets:
     runs-on: ubuntu-latest
     steps:
