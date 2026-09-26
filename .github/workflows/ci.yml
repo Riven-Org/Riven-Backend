@@ -12,6 +12,24 @@ concurrency:
 jobs:
   python:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: riven
+          POSTGRES_PASSWORD: riven
+          POSTGRES_DB: riven_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U riven" --health-interval 5s --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping" --health-interval 5s --health-retries 10
+    env:
+      RIVEN_TEST_DATABASE_URL: postgresql+asyncpg://riven:riven@localhost:5432/riven_test
+      RIVEN_TEST_REDIS_URL: redis://localhost:6379/15
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v3
@@ -21,7 +39,7 @@ jobs:
       - run: uv sync --frozen
       - run: uv run ruff check .
       - run: uv run ruff format --check .
-      - run: uv run mypy apps/api/src apps/worker/src packages/schemas/src
+      - run: uv run mypy apps/api/src apps/worker/src packages/schemas/src packages/events/src
       - run: uv run pytest
       - name: Export contracts as JSON Schema
         run: uv run python -m riven_schemas.export build/json-schema

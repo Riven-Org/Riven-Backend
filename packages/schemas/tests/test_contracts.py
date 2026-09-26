@@ -146,3 +146,20 @@ def test_changing_an_event_type_constant_is_breaking() -> None:
     assert breaking_changes(_schema(Old), _schema(New)) == [
         "$.type: constant changed from 'bug.confirmed' to 'bug.found'"
     ]
+
+
+def test_every_event_has_a_producer_and_consumers_in_the_catalog() -> None:
+    from riven_schemas.catalog import ROUTES
+    from riven_schemas.contracts import EVENTS
+
+    assert {e.model_fields["type"].default for e in EVENTS} == set(ROUTES)
+
+
+def test_event_catalog_doc_is_up_to_date() -> None:
+    from riven_schemas.catalog import render
+
+    doc = Path(__file__).resolve().parents[3] / "docs" / "events.md"
+
+    assert doc.read_text() == render(), (
+        "docs/events.md is stale: uv run python -m riven_schemas.catalog > docs/events.md"
+    )

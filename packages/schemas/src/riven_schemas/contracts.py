@@ -4,9 +4,9 @@ Adding a model that crosses a service boundary means adding it here; the contrac
 guard it against breaking changes.
 """
 
-from typing import Any
+from typing import Annotated, Any, Union
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, TypeAdapter
 
 from riven_schemas.domain import ChangeRef, Producer
 from riven_schemas.entities import (
@@ -56,3 +56,13 @@ CONTRACTS: dict[str, type[BaseModel]] = {model.__name__: model for model in _MOD
 def json_schemas() -> dict[str, dict[str, Any]]:
     """JSON Schema of every contract, keyed by model name."""
     return {name: model.model_json_schema() for name, model in CONTRACTS.items()}
+
+
+_EVENT_ADAPTER: TypeAdapter[DomainEvent] = TypeAdapter(
+    Annotated[Union[*EVENTS], Field(discriminator="type")]  # noqa: UP007
+)
+
+
+def parse_event(data: str | bytes) -> DomainEvent:
+    """Decode an event from its JSON form into the concrete event class."""
+    return _EVENT_ADAPTER.validate_json(data)

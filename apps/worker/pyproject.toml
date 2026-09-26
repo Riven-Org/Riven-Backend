@@ -5,6 +5,7 @@ description = "Riven Temporal worker: runs the verification pipeline"
 requires-python = ">=3.12"
 dependencies = [
     "riven-schemas",
+    "riven-events",
     "temporalio>=1.7",
     "pydantic-settings>=2.4",
 ]
