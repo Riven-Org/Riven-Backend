@@ -1,6 +1,6 @@
 """Object storage for run logs and artifacts (ticket S01.4.3).
 
-Services never write artifacts to local disk: bytes go to an S3-compatible bucket (MinIO
+Services never write artifacts to local disk: bytes go to an S3-compatible bucket (SeaweedFS
 locally, S3 in the cloud) under an org-prefixed key, and users download them through
 short-lived presigned URLs.
 """

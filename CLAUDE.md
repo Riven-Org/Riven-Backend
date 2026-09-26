@@ -39,7 +39,7 @@ uv run pytest apps/api/tests/test_health.py::test_health_returns_ok    # single 
 uv run pytest -k workflow                # by keyword
 make fmt                                 # auto-fix lint + format
 make dev                                 # whole stack in Docker + migrations + demo seed (CI job `stack` runs it)
-make up && make migrate                  # infra only (Postgres(pgvector)/Redis/MinIO/Temporal), then Alembic
+make up && make migrate                  # infra only (Postgres(pgvector)/Redis/S3 (SeaweedFS)/Temporal), then Alembic
 make seed                                # demo org `demo` / repo `riven-demo/shop` (idempotent)
 make api                                 # :8000, OpenAPI docs at /docs
 make worker                              # Temporal worker, task queue "verification"
@@ -65,7 +65,7 @@ Decisions and reasons: `docs/adr/` (0001 stack, 0002 service decomposition and d
 - `services/<area>.py`: business logic; routers call services, services take an `AsyncSession`.
 - Models: SQLAlchemy 2.0 typed models live in `packages/db` (`riven_db.models.<owning service>`, ADR 0011) because worker services own tables too. Every domain table uses `TenantMixin` (non-null indexed `org_id`); queries are always org-scoped. Export new model modules from `riven_db/models/__init__.py` so autogenerate and the drift test see them.
 - Every schema change is an Alembic migration named `<ID>: …`; never edit an applied migration. `packages/db/tests/test_migrations.py` fails when models and migrations drift.
-- Logs and artifacts go to object storage through `riven_storage.ObjectStore` (MinIO locally, S3 in the cloud), downloaded via presigned URLs; services never write to local disk (a test enforces it).
+- Logs and artifacts go to object storage through `riven_storage.ObjectStore` (SeaweedFS locally, S3 in the cloud), downloaded via presigned URLs; services never write to local disk (a test enforces it).
 - Tests use `create_app()` + `app.dependency_overrides[get_session]`; no test may require a live external service unless CI provides it. CI provides Postgres (pgvector) and Redis: tests using the root `conftest.py` fixtures (`sessions`, `db_engine`, `redis`) run against a migrated database when `RIVEN_TEST_DATABASE_URL` is set and are skipped otherwise; `redis` falls back to fakeredis.
 
 **`apps/worker`** — pipeline logic lives in activities; `VerificationWorkflow` only orchestrates. Workflow code must stay deterministic (no I/O, clock, randomness; imports of app code inside `workflow.unsafe.imports_passed_through()`). Register new activities in `ALL_ACTIVITIES` with an explicit timeout and `STAGE_RETRY`. Client and worker must both use `pydantic_data_converter`. `workflow_id_for()` is the idempotency key per (org, repo, commit) — keep it stable.

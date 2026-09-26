@@ -15,7 +15,7 @@ packages/
   schemas/    Shared Pydantic contracts and domain events (+ JSON Schema baselines)
   events/     Transactional outbox, Redis Streams relay, idempotent consumers
   db/         SQLAlchemy models for every service's tables, demo seed
-  storage/    Object storage for run logs and artifacts (MinIO / S3)
+  storage/    Object storage for run logs and artifacts (SeaweedFS locally / S3)
 docs/adr/     Architecture decision records
 docs/events.md  Event catalog (generated)
 ```
@@ -26,8 +26,8 @@ other records in [docs/adr](docs/adr).
 ## Setup in five steps
 
 You need **Docker with Compose v2.20+**, **Python 3.12** and **[uv](https://docs.astral.sh/uv/)**
-(`curl -LsSf https://astral.sh/uv/install.sh | sh`). Ports 5432, 6379, 7233, 8000, 8080, 9000
-and 9001 must be free.
+(`curl -LsSf https://astral.sh/uv/install.sh | sh`). Ports 5432, 6379, 7233, 8000, 8080 and 9000
+must be free.
 
 1. **Clone and configure**
    ```bash
@@ -42,7 +42,7 @@ and 9001 must be free.
    ```bash
    make dev
    ```
-   This starts Postgres, Redis, MinIO and Temporal, waits until they are healthy, creates the
+   This starts Postgres, Redis, S3 storage (SeaweedFS) and Temporal, waits until they are healthy, creates the
    artifacts bucket, applies migrations, starts the API, worker and outbox relay, and loads the
    demo org. The first run builds the image and takes a few minutes.
 4. **Check it works**
@@ -54,7 +54,7 @@ and 9001 must be free.
    |---|---|---|
    | API docs | http://localhost:8000/docs | — |
    | Temporal UI | http://localhost:8080 | — |
-   | MinIO console | http://localhost:9001 | `riven` / `riven-dev-secret` |
+   | S3 API (SeaweedFS) | http://localhost:9000 | any key (auth off in dev) |
 5. **Run the checks CI runs**
    ```bash
    make check
@@ -74,7 +74,7 @@ Run infrastructure in Docker and the app on your machine with hot reload:
 
 ```bash
 docker compose stop api worker relay   # if `make dev` started them
-make up          # Postgres, Redis, MinIO, Temporal only
+make up          # Postgres, Redis, S3, Temporal only
 make migrate     # apply migrations to the database in .env
 make seed        # demo data (optional)
 make api         # http://localhost:8000 with reload

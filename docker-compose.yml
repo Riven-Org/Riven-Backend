@@ -4,7 +4,7 @@ x-riven-env: &riven-env
   RIVEN_DATABASE_URL: postgresql+asyncpg://riven:riven@postgres:5432/riven
   RIVEN_REDIS_URL: redis://redis:6379/0
   RIVEN_TEMPORAL_ADDRESS: temporal:7233
-  RIVEN_S3_ENDPOINT_URL: http://minio:9000
+  RIVEN_S3_ENDPOINT_URL: http://s3:8333
   RIVEN_S3_BUCKET: riven-artifacts
   RIVEN_S3_ACCESS_KEY: riven
   RIVEN_S3_SECRET_KEY: riven-dev-secret
@@ -38,28 +38,25 @@ services:
       interval: 5s
       retries: 20
 
-  minio:
-    image: minio/minio:RELEASE.2025-04-22T22-12-26Z
-    command: server /data --console-address ":9001"
-    environment:
-      MINIO_ROOT_USER: riven
-      MINIO_ROOT_PASSWORD: riven-dev-secret
-    ports: ["9000:9000", "9001:9001"]
-    volumes: [miniodata:/data]
+  # S3-compatible object storage (SeaweedFS, Apache-2.0). Host port 9000 = S3 API.
+  s3:
+    image: chrislusf/seaweedfs:3.99
+    command: server -dir=/data -s3 -s3.port=8333 -master.volumeSizeLimitMB=1024
+    ports: ["9000:8333"]
+    volumes: [s3data:/data]
     healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 8333"]
       interval: 5s
-      retries: 20
+      retries: 30
 
   # One-shot: create the artifacts bucket.
-  minio-init:
-    image: minio/mc:RELEASE.2025-04-16T18-13-26Z
+  storage-init:
+    <<: *riven-app
+    restart: "no"
     depends_on:
-      minio:
+      s3:
         condition: service_healthy
-    entrypoint: >-
-      sh -c "mc alias set local http://minio:9000 riven riven-dev-secret &&
-             mc mb --ignore-existing local/riven-artifacts"
+    command: ["python", "-m", "riven_storage"]
     profiles: [init]
 
   # Temporal stores its own state in the same Postgres (separate databases).
@@ -138,4 +135,4 @@ services:
 volumes:
   pgdata:
   redisdata:
-  miniodata:
+  s3data:

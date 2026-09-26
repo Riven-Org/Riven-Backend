@@ -21,7 +21,7 @@ any process can serve them.
 - Every domain table has a non-null, indexed `org_id` from its first migration (there is no
   existing data to backfill), ready for row-level security in S03.2.
 - **`packages/storage` (`riven_storage`)** is the only way services store logs and
-  artifacts: an S3-compatible bucket (MinIO locally, S3 in the cloud) under
+  artifacts: an S3-compatible bucket (SeaweedFS locally, S3 in the cloud) under
   `<org_id>/<run_id>/<name>` keys, downloaded through presigned URLs (15 minutes by default).
   The `artifacts` table keeps the metadata. A test fails if service code writes to local
   disk.
@@ -32,3 +32,9 @@ any process can serve them.
 
 - One ownership rule still applies: a service writes only its own module's tables.
 - `apps/api/src/riven_api/models/` is not used; `CLAUDE.md` points to `riven_db`.
+
+## Amendment (2026-09-27)
+
+MinIO no longer publishes free container images, so local development uses **SeaweedFS**
+(Apache-2.0, S3-compatible) instead. The code only speaks the S3 API, so nothing else
+changed; ADR 0001's "MinIO locally" now reads "an S3-compatible server locally".
