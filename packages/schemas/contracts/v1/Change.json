@@ -1,0 +1,125 @@
+{
+  "$defs": {
+    "ChangeRef": {
+      "description": "Identifies one change (commit or PR) in one repository.",
+      "properties": {
+        "commit_sha": {
+          "title": "Commit Sha",
+          "type": "string"
+        },
+        "org_id": {
+          "title": "Org Id",
+          "type": "string"
+        },
+        "pr_number": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pr Number"
+        },
+        "repo": {
+          "title": "Repo",
+          "type": "string"
+        }
+      },
+      "required": [
+        "org_id",
+        "repo",
+        "commit_sha"
+      ],
+      "title": "ChangeRef",
+      "type": "object"
+    },
+    "Producer": {
+      "properties": {
+        "agent_model": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Agent Model"
+        },
+        "identity": {
+          "title": "Identity",
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/ProducerKind"
+        }
+      },
+      "required": [
+        "kind",
+        "identity"
+      ],
+      "title": "Producer",
+      "type": "object"
+    },
+    "ProducerKind": {
+      "description": "Who produced a change. Needed to enforce 'Riven never approves its own work'.",
+      "enum": [
+        "human",
+        "ai_agent",
+        "bot",
+        "unknown"
+      ],
+      "title": "ProducerKind",
+      "type": "string"
+    }
+  },
+  "description": "A captured commit or PR and who produced it (capture service).",
+  "properties": {
+    "branch": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Branch"
+    },
+    "captured_at": {
+      "format": "date-time",
+      "title": "Captured At",
+      "type": "string"
+    },
+    "files_changed": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Files Changed",
+      "type": "array"
+    },
+    "producer": {
+      "$ref": "#/$defs/Producer"
+    },
+    "ref": {
+      "$ref": "#/$defs/ChangeRef"
+    },
+    "title": {
+      "default": "",
+      "title": "Title",
+      "type": "string"
+    }
+  },
+  "required": [
+    "ref",
+    "producer",
+    "captured_at"
+  ],
+  "title": "Change",
+  "type": "object"
+}

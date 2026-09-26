@@ -1,0 +1,25 @@
+{
+  "description": "Result of the nightly graph consistency check (S01.4.4).",
+  "properties": {
+    "checked_at": {
+      "format": "date-time",
+      "title": "Checked At",
+      "type": "string"
+    },
+    "checked_edges": {
+      "title": "Checked Edges",
+      "type": "integer"
+    },
+    "orphaned_edges": {
+      "title": "Orphaned Edges",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "checked_edges",
+    "orphaned_edges",
+    "checked_at"
+  ],
+  "title": "GraphConsistencyReport",
+  "type": "object"
+}

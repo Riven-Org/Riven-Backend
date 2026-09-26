@@ -4,10 +4,8 @@ from temporalio import workflow
 from temporalio.common import RetryPolicy
 
 with workflow.unsafe.imports_passed_through():
-    from riven_schemas import ChangeRef, VerificationStatus
+    from riven_schemas import ChangeRef, StageResult, VerdictResult, VerificationStatus
     from riven_worker.activities import (
-        StageResult,
-        VerdictResult,
         analyze_change,
         run_in_sandbox,
         update_graph,

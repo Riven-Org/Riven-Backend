@@ -1,0 +1,83 @@
+{
+  "$defs": {
+    "ChangeRef": {
+      "description": "Identifies one change (commit or PR) in one repository.",
+      "properties": {
+        "commit_sha": {
+          "title": "Commit Sha",
+          "type": "string"
+        },
+        "org_id": {
+          "title": "Org Id",
+          "type": "string"
+        },
+        "pr_number": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pr Number"
+        },
+        "repo": {
+          "title": "Repo",
+          "type": "string"
+        }
+      },
+      "required": [
+        "org_id",
+        "repo",
+        "commit_sha"
+      ],
+      "title": "ChangeRef",
+      "type": "object"
+    },
+    "LockStatus": {
+      "enum": [
+        "active",
+        "retired"
+      ],
+      "title": "LockStatus",
+      "type": "string"
+    }
+  },
+  "description": "A test that fails on the buggy commit and passes on the fix (memory service).",
+  "properties": {
+    "bug_id": {
+      "title": "Bug Id",
+      "type": "string"
+    },
+    "fixed_by": {
+      "$ref": "#/$defs/ChangeRef"
+    },
+    "id": {
+      "title": "Id",
+      "type": "string"
+    },
+    "org_id": {
+      "title": "Org Id",
+      "type": "string"
+    },
+    "status": {
+      "$ref": "#/$defs/LockStatus",
+      "default": "active"
+    },
+    "test_ref": {
+      "title": "Test Ref",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "org_id",
+    "bug_id",
+    "test_ref",
+    "fixed_by"
+  ],
+  "title": "RegressionLock",
+  "type": "object"
+}

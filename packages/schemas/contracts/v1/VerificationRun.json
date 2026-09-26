@@ -1,0 +1,158 @@
+{
+  "$defs": {
+    "ChangeRef": {
+      "description": "Identifies one change (commit or PR) in one repository.",
+      "properties": {
+        "commit_sha": {
+          "title": "Commit Sha",
+          "type": "string"
+        },
+        "org_id": {
+          "title": "Org Id",
+          "type": "string"
+        },
+        "pr_number": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pr Number"
+        },
+        "repo": {
+          "title": "Repo",
+          "type": "string"
+        }
+      },
+      "required": [
+        "org_id",
+        "repo",
+        "commit_sha"
+      ],
+      "title": "ChangeRef",
+      "type": "object"
+    },
+    "RunState": {
+      "description": "Lifecycle of one verification run (orchestrator).",
+      "enum": [
+        "queued",
+        "running",
+        "completed",
+        "cancelled"
+      ],
+      "title": "RunState",
+      "type": "string"
+    },
+    "StageResult": {
+      "description": "Outcome of one pipeline stage (Temporal activity result).",
+      "properties": {
+        "detail": {
+          "default": "",
+          "title": "Detail",
+          "type": "string"
+        },
+        "ok": {
+          "title": "Ok",
+          "type": "boolean"
+        },
+        "stage": {
+          "$ref": "#/$defs/VerificationStage"
+        }
+      },
+      "required": [
+        "stage",
+        "ok"
+      ],
+      "title": "StageResult",
+      "type": "object"
+    },
+    "VerificationStage": {
+      "description": "Pipeline stages, in order (MVP flow).",
+      "enum": [
+        "capture",
+        "analyze",
+        "sandbox",
+        "verify",
+        "memory",
+        "graph"
+      ],
+      "title": "VerificationStage",
+      "type": "string"
+    },
+    "VerificationStatus": {
+      "enum": [
+        "passed",
+        "failed",
+        "needs_review"
+      ],
+      "title": "VerificationStatus",
+      "type": "string"
+    }
+  },
+  "description": "One verification of one change (orchestrator service).",
+  "properties": {
+    "change": {
+      "$ref": "#/$defs/ChangeRef"
+    },
+    "finished_at": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Finished At"
+    },
+    "id": {
+      "title": "Id",
+      "type": "string"
+    },
+    "stages": {
+      "items": {
+        "$ref": "#/$defs/StageResult"
+      },
+      "title": "Stages",
+      "type": "array"
+    },
+    "started_at": {
+      "format": "date-time",
+      "title": "Started At",
+      "type": "string"
+    },
+    "state": {
+      "$ref": "#/$defs/RunState"
+    },
+    "verdict": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/VerificationStatus"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "verifier_identity": {
+      "title": "Verifier Identity",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "change",
+    "state",
+    "verifier_identity",
+    "started_at"
+  ],
+  "title": "VerificationRun",
+  "type": "object"
+}

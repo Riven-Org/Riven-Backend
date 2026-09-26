@@ -1,0 +1,124 @@
+{
+  "$defs": {
+    "BugState": {
+      "description": "Bug lifecycle (ticket S08.2).",
+      "enum": [
+        "new",
+        "confirmed",
+        "fixing",
+        "fix_verified",
+        "locked",
+        "reopened"
+      ],
+      "title": "BugState",
+      "type": "string"
+    },
+    "ChangeRef": {
+      "description": "Identifies one change (commit or PR) in one repository.",
+      "properties": {
+        "commit_sha": {
+          "title": "Commit Sha",
+          "type": "string"
+        },
+        "org_id": {
+          "title": "Org Id",
+          "type": "string"
+        },
+        "pr_number": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pr Number"
+        },
+        "repo": {
+          "title": "Repo",
+          "type": "string"
+        }
+      },
+      "required": [
+        "org_id",
+        "repo",
+        "commit_sha"
+      ],
+      "title": "ChangeRef",
+      "type": "object"
+    },
+    "Severity": {
+      "enum": [
+        "low",
+        "medium",
+        "high",
+        "critical"
+      ],
+      "title": "Severity",
+      "type": "string"
+    }
+  },
+  "description": "A remembered bug, recognised across runs by its fingerprint (memory service).",
+  "properties": {
+    "fingerprint": {
+      "title": "Fingerprint",
+      "type": "string"
+    },
+    "first_seen": {
+      "$ref": "#/$defs/ChangeRef"
+    },
+    "id": {
+      "title": "Id",
+      "type": "string"
+    },
+    "module": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Module"
+    },
+    "occurrences": {
+      "default": 1,
+      "title": "Occurrences",
+      "type": "integer"
+    },
+    "org_id": {
+      "title": "Org Id",
+      "type": "string"
+    },
+    "repo": {
+      "title": "Repo",
+      "type": "string"
+    },
+    "severity": {
+      "$ref": "#/$defs/Severity"
+    },
+    "state": {
+      "$ref": "#/$defs/BugState"
+    },
+    "title": {
+      "title": "Title",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "org_id",
+    "repo",
+    "fingerprint",
+    "title",
+    "state",
+    "severity",
+    "first_seen"
+  ],
+  "title": "Bug",
+  "type": "object"
+}

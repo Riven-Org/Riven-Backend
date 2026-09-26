@@ -1,0 +1,88 @@
+{
+  "$defs": {
+    "ChangeRef": {
+      "description": "Identifies one change (commit or PR) in one repository.",
+      "properties": {
+        "commit_sha": {
+          "title": "Commit Sha",
+          "type": "string"
+        },
+        "org_id": {
+          "title": "Org Id",
+          "type": "string"
+        },
+        "pr_number": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pr Number"
+        },
+        "repo": {
+          "title": "Repo",
+          "type": "string"
+        }
+      },
+      "required": [
+        "org_id",
+        "repo",
+        "commit_sha"
+      ],
+      "title": "ChangeRef",
+      "type": "object"
+    }
+  },
+  "description": "A fixed bug now has a regression lock guarding it.",
+  "properties": {
+    "bug_id": {
+      "title": "Bug Id",
+      "type": "string"
+    },
+    "event_id": {
+      "format": "uuid",
+      "title": "Event Id",
+      "type": "string"
+    },
+    "fixed_by": {
+      "$ref": "#/$defs/ChangeRef"
+    },
+    "lock_id": {
+      "title": "Lock Id",
+      "type": "string"
+    },
+    "occurred_at": {
+      "format": "date-time",
+      "title": "Occurred At",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "1",
+      "default": "1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "test_ref": {
+      "title": "Test Ref",
+      "type": "string"
+    },
+    "type": {
+      "const": "lock.created",
+      "default": "lock.created",
+      "title": "Type",
+      "type": "string"
+    }
+  },
+  "required": [
+    "bug_id",
+    "lock_id",
+    "test_ref",
+    "fixed_by"
+  ],
+  "title": "LockCreated",
+  "type": "object"
+}

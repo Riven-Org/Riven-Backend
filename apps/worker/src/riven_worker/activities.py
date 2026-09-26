@@ -4,21 +4,9 @@ Each stage is a separate activity so Temporal can retry it on its own and resume
 the run after a crash. Bodies are placeholders; each names the ticket that fills it in.
 """
 
-from pydantic import BaseModel
 from temporalio import activity
 
-from riven_schemas import ChangeRef, VerificationStage, VerificationStatus
-
-
-class StageResult(BaseModel):
-    stage: VerificationStage
-    ok: bool
-    detail: str = ""
-
-
-class VerdictResult(BaseModel):
-    status: VerificationStatus
-    stages: list[StageResult]
+from riven_schemas import ChangeRef, StageResult, VerificationStage
 
 
 @activity.defn

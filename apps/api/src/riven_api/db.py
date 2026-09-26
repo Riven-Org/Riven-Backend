@@ -1,33 +1,22 @@
 from collections.abc import AsyncIterator
-from datetime import datetime
 from functools import lru_cache
 
-from sqlalchemy import DateTime, String, func
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
     async_sessionmaker,
     create_async_engine,
 )
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 from riven_api.config import get_settings
+from riven_db import Base, TenantMixin
 
-
-class Base(DeclarativeBase):
-    pass
-
-
-class TenantMixin:
-    """Every domain table is scoped to an org (tickets S01.4, S03.2)."""
-
-    org_id: Mapped[str] = mapped_column(String(64), index=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+__all__ = ["Base", "TenantMixin", "get_engine", "get_session"]
 
 
 @lru_cache
 def get_engine() -> AsyncEngine:
-    return create_async_engine(get_settings().database_url, pool_pre_ping=True)
+    return create_async_engine(get_settings().database_url.get_secret_value(), pool_pre_ping=True)
 
 
 async def get_session() -> AsyncIterator[AsyncSession]:

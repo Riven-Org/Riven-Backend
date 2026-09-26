@@ -10,12 +10,16 @@ from riven_schemas.domain import ChangeRef, Producer, VerificationStatus
 
 
 class DomainEvent(BaseModel):
+    """Base of every event. `event_id` is the idempotency key consumers deduplicate on."""
+
     event_id: UUID = Field(default_factory=uuid4)
     occurred_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     schema_version: Literal["1"] = "1"
 
 
 class ChangeCaptured(DomainEvent):
+    """A commit or PR was captured, with the identity that produced it."""
+
     type: Literal["change.captured"] = "change.captured"
     change: ChangeRef
     producer: Producer
@@ -23,6 +27,8 @@ class ChangeCaptured(DomainEvent):
 
 
 class VerificationCompleted(DomainEvent):
+    """A verification run finished with a verdict from an independent verifier."""
+
     type: Literal["verification.completed"] = "verification.completed"
     change: ChangeRef
     run_id: str
@@ -31,8 +37,30 @@ class VerificationCompleted(DomainEvent):
 
 
 class BugConfirmed(DomainEvent):
+    """A failure was confirmed as a bug and stored in bug memory."""
+
     type: Literal["bug.confirmed"] = "bug.confirmed"
     change: ChangeRef
     bug_id: str
     fingerprint: str
     module: str | None = None
+
+
+class RegressionDetected(DomainEvent):
+    """A previously fixed bug came back: its regression lock failed on a new change."""
+
+    type: Literal["regression.detected"] = "regression.detected"
+    change: ChangeRef
+    bug_id: str
+    lock_id: str
+    fingerprint: str
+
+
+class LockCreated(DomainEvent):
+    """A fixed bug now has a regression lock guarding it."""
+
+    type: Literal["lock.created"] = "lock.created"
+    bug_id: str
+    lock_id: str
+    test_ref: str
+    fixed_by: ChangeRef
