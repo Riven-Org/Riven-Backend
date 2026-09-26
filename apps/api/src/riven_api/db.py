@@ -16,7 +16,7 @@ __all__ = ["Base", "TenantMixin", "get_engine", "get_session"]
 
 @lru_cache
 def get_engine() -> AsyncEngine:
-    return create_async_engine(get_settings().database_url, pool_pre_ping=True)
+    return create_async_engine(get_settings().database_url.get_secret_value(), pool_pre_ping=True)
 
 
 async def get_session() -> AsyncIterator[AsyncSession]:

@@ -15,7 +15,8 @@ target_metadata = [Base.metadata, EventsBase.metadata]
 
 def _url() -> str:
     """`sqlalchemy.url` set programmatically (tests) wins over settings."""
-    return context.config.get_main_option("sqlalchemy.url") or get_settings().database_url
+    configured = context.config.get_main_option("sqlalchemy.url")
+    return configured or get_settings().database_url.get_secret_value()
 
 
 def run_offline() -> None:

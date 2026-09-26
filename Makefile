@@ -49,7 +49,7 @@ fmt:
 	uv run ruff format .
 
 typecheck:
-	uv run mypy apps/api/src apps/worker/src packages/schemas/src packages/events/src packages/db/src packages/storage/src
+	uv run mypy apps/api/src apps/worker/src packages/schemas/src packages/events/src packages/db/src packages/storage/src packages/config/src
 
 check: lint typecheck test   ## Everything CI runs
 

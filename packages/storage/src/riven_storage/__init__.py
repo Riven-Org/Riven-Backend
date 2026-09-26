@@ -11,19 +11,10 @@ from typing import Any
 
 import boto3
 from botocore.config import Config
-from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from riven_config import StorageSettings
 
 _UNSAFE = re.compile(r"[^A-Za-z0-9._-]")
-
-
-class StorageSettings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_prefix="RIVEN_S3_", extra="ignore")
-
-    endpoint_url: str | None = "http://localhost:9000"
-    region: str = "us-east-1"
-    bucket: str = "riven-artifacts"
-    access_key: str = "riven"
-    secret_key: str = "riven-dev-secret"
 
 
 def artifact_key(org_id: str, run_id: str, name: str) -> str:
@@ -38,19 +29,19 @@ class ObjectStore:
     """Async facade over an S3-compatible bucket (boto3 calls run in a thread)."""
 
     def __init__(self, settings: StorageSettings | None = None, client: Any = None) -> None:
-        self.settings = settings or StorageSettings()
+        self.settings = settings or StorageSettings.load()
         self._client = client or boto3.client(
             "s3",
-            endpoint_url=self.settings.endpoint_url,
-            region_name=self.settings.region,
-            aws_access_key_id=self.settings.access_key,
-            aws_secret_access_key=self.settings.secret_key,
+            endpoint_url=self.settings.s3_endpoint_url,
+            region_name=self.settings.s3_region,
+            aws_access_key_id=self.settings.s3_access_key,
+            aws_secret_access_key=self.settings.s3_secret_key.get_secret_value(),
             config=Config(signature_version="s3v4"),
         )
 
     @property
     def bucket(self) -> str:
-        return self.settings.bucket
+        return self.settings.s3_bucket
 
     async def ensure_bucket(self) -> None:
         existing = await asyncio.to_thread(self._client.list_buckets)

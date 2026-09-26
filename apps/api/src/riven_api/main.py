@@ -19,7 +19,7 @@ def create_app() -> FastAPI:
 
     @app.get("/v1/meta")
     async def meta() -> dict[str, str]:
-        return {"env": settings.env, "schema_version": SCHEMA_VERSION}
+        return {"env": settings.env.value, "schema_version": SCHEMA_VERSION}
 
     return app
 

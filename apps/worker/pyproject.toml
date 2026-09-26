@@ -9,7 +9,7 @@ dependencies = [
     "riven-db",
     "riven-storage",
     "temporalio>=1.7",
-    "pydantic-settings>=2.4",
+    "riven-config",
 ]
 
 [build-system]

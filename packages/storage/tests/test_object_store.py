@@ -12,7 +12,7 @@ from riven_storage import ObjectStore, StorageSettings, artifact_key
 @pytest.fixture
 def store() -> Iterator[ObjectStore]:
     with mock_aws():
-        settings = StorageSettings(endpoint_url=None, bucket="test-artifacts")
+        settings = StorageSettings(s3_endpoint_url=None, s3_bucket="test-artifacts")
         sigv4 = Config(signature_version="s3v4")
         client = boto3.client("s3", region_name="us-east-1", config=sigv4)
         yield ObjectStore(settings, client)

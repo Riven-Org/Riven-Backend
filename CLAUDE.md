@@ -50,9 +50,11 @@ Docker is not installed on the maintainer's machine; `make up`/`make dev` may be
 
 ## Architecture and conventions
 
-Decisions and reasons: `docs/adr/` (0001 stack, 0002 service decomposition and data ownership, 0003–0010 one per service, 0011 shared persistence package and object storage). New significant decisions get a new numbered ADR in the same PR.
+Decisions and reasons: `docs/adr/` (0001 stack, 0002 service decomposition and data ownership, 0003–0010 one per service, 0011 shared persistence package and object storage, 0012 configuration and secrets). New significant decisions get a new numbered ADR in the same PR.
 
-**Workspace** (uv): `apps/api` (`riven_api`), `apps/worker` (`riven_worker`), `packages/schemas` (`riven_schemas`), `packages/events` (`riven_events`), `packages/db` (`riven_db`), `packages/storage` (`riven_storage`). mypy strict covers every `src/` tree; ruff treats the packages as first-party.
+**Workspace** (uv): `apps/api` (`riven_api`), `apps/worker` (`riven_worker`), `packages/schemas` (`riven_schemas`), `packages/events` (`riven_events`), `packages/db` (`riven_db`), `packages/storage` (`riven_storage`), `packages/config` (`riven_config`). mypy strict covers every `src/` tree; ruff treats the packages as first-party.
+
+**Configuration** (`riven_config`, S02.2, ADR 0012) — every service's settings subclass the blocks in `riven_config` (`DatabaseSettings`, `RedisSettings`, `TemporalSettings`, `StorageSettings`) and are built with `.load()` at startup, which exits on invalid config. Never read `os.environ` directly. Secrets are `SecretStr` (call `.get_secret_value()` only where the value is used) and can come from files in `RIVEN_SECRETS_DIR`. Staging/prod reject development credentials.
 
 **Events** (`riven_events`, S01.3) — publish a domain event with `add_event(session, event, org_id=...)` inside the same transaction as the state change; never write to Redis directly. `make relay` runs the outbox relay (→ Redis Stream `riven:events`). Consume with `EventConsumer(name, sessions, redis, {"<type>": handler})`: the handler runs in the transaction that records the event as processed, so do all side effects through that session. New events: add to `EVENTS` and `catalog.ROUTES`, then `make catalog` (the catalog test fails otherwise). Catalog: `docs/events.md`.
 

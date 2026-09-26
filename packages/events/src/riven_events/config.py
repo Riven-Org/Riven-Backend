@@ -1,9 +1,7 @@
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from riven_config import DatabaseSettings, RedisSettings
 
 
-class EventSettings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_prefix="RIVEN_", extra="ignore")
+class EventSettings(DatabaseSettings, RedisSettings):
+    """Outbox relay settings, validated at startup (ticket S02.2)."""
 
-    database_url: str = "postgresql+asyncpg://riven:riven@localhost:5432/riven"
-    redis_url: str = "redis://localhost:6379/0"
     outbox_poll_seconds: float = 0.5

@@ -13,10 +13,10 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+from riven_config import DatabaseSettings
 from riven_db.models import (
     Bug,
     Change,
@@ -36,13 +36,6 @@ from riven_schemas import (
     VerificationStage,
     VerificationStatus,
 )
-
-
-class SeedSettings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_prefix="RIVEN_", extra="ignore")
-
-    database_url: str = "postgresql+asyncpg://riven:riven@localhost:5432/riven"
-
 
 DEMO_ORG = "demo"
 DEMO_REPO = "riven-demo/shop"
@@ -248,7 +241,7 @@ async def seed(session: AsyncSession) -> bool:
 
 
 async def main() -> None:
-    engine = create_async_engine(SeedSettings().database_url)
+    engine = create_async_engine(DatabaseSettings.load().database_url.get_secret_value())
     async with async_sessionmaker(engine, expire_on_commit=False)() as session, session.begin():
         created = await seed(session)
     await engine.dispose()
