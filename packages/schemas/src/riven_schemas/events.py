@@ -36,3 +36,21 @@ class BugConfirmed(DomainEvent):
     bug_id: str
     fingerprint: str
     module: str | None = None
+
+
+class RegressionDetected(DomainEvent):
+    """A previously fixed bug came back: its regression lock failed on a new change."""
+
+    type: Literal["regression.detected"] = "regression.detected"
+    change: ChangeRef
+    bug_id: str
+    lock_id: str
+    fingerprint: str
+
+
+class LockCreated(DomainEvent):
+    type: Literal["lock.created"] = "lock.created"
+    bug_id: str
+    lock_id: str
+    test_ref: str
+    fixed_by: ChangeRef

@@ -48,11 +48,11 @@ Docker is not installed on the maintainer's machine; `make up` may be unavailabl
 
 ## Architecture and conventions
 
-Decisions and reasons: `docs/adr/0001-tech-stack.md`. New significant decisions get a new numbered ADR in the same PR.
+Decisions and reasons: `docs/adr/` (0001 stack, 0002 service decomposition and data ownership, 0003–0010 one per service). New significant decisions get a new numbered ADR in the same PR.
 
 **Workspace** (uv): `apps/api` (`riven_api`), `apps/worker` (`riven_worker`), `packages/schemas` (`riven_schemas`). mypy strict covers all three `src/` trees; ruff treats the three packages as first-party.
 
-**`packages/schemas`** — every payload that crosses a service boundary (API ↔ worker, events, Temporal inputs/outputs). Never define such a model inside one app. Events subclass `DomainEvent` with a `type: Literal["noun.verb"]`; additive changes keep `schema_version`, breaking changes bump it and add a contract test.
+**`packages/schemas`** — every payload that crosses a service boundary (API ↔ worker, events, Temporal inputs/outputs). Never define such a model inside one app. Events subclass `DomainEvent` with a `type: Literal["noun.verb"]`. Register every contract in `contracts.py`; `test_contracts.py` compares it with the committed baseline in `packages/schemas/contracts/v<SCHEMA_VERSION>/`. Additive changes pass; a breaking change fails CI until you bump `SCHEMA_VERSION` and write a new baseline (`uv run python -m riven_schemas.export --snapshot`). Service boundaries and table ownership: ADRs 0002–0010.
 
 **`apps/api`** — build new features in this shape:
 - `routers/<resource>.py`: thin HTTP layer, mounted under `/v1` (health stays unversioned). Declare the required permission on every mutating endpoint once RBAC (S03.3) exists.

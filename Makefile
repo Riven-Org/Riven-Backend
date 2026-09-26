@@ -1,4 +1,4 @@
-.PHONY: install up down api worker migrate test lint fmt typecheck check
+.PHONY: install up down api worker migrate test lint fmt typecheck check schemas
 
 install:        ## Install dependencies and git hooks
 	uv sync
@@ -34,3 +34,6 @@ typecheck:
 	uv run mypy apps/api/src apps/worker/src packages/schemas/src
 
 check: lint typecheck test   ## Everything CI runs
+
+schemas:        ## Export contracts as JSON Schema to build/json-schema
+	uv run python -m riven_schemas.export build/json-schema

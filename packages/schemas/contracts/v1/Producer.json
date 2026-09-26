@@ -1,0 +1,42 @@
+{
+  "$defs": {
+    "ProducerKind": {
+      "description": "Who produced a change. Needed to enforce 'Riven never approves its own work'.",
+      "enum": [
+        "human",
+        "ai_agent",
+        "bot",
+        "unknown"
+      ],
+      "title": "ProducerKind",
+      "type": "string"
+    }
+  },
+  "properties": {
+    "agent_model": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Agent Model"
+    },
+    "identity": {
+      "title": "Identity",
+      "type": "string"
+    },
+    "kind": {
+      "$ref": "#/$defs/ProducerKind"
+    }
+  },
+  "required": [
+    "kind",
+    "identity"
+  ],
+  "title": "Producer",
+  "type": "object"
+}

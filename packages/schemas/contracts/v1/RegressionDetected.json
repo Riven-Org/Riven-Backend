@@ -1,0 +1,88 @@
+{
+  "$defs": {
+    "ChangeRef": {
+      "description": "Identifies one change (commit or PR) in one repository.",
+      "properties": {
+        "commit_sha": {
+          "title": "Commit Sha",
+          "type": "string"
+        },
+        "org_id": {
+          "title": "Org Id",
+          "type": "string"
+        },
+        "pr_number": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pr Number"
+        },
+        "repo": {
+          "title": "Repo",
+          "type": "string"
+        }
+      },
+      "required": [
+        "org_id",
+        "repo",
+        "commit_sha"
+      ],
+      "title": "ChangeRef",
+      "type": "object"
+    }
+  },
+  "description": "A previously fixed bug came back: its regression lock failed on a new change.",
+  "properties": {
+    "bug_id": {
+      "title": "Bug Id",
+      "type": "string"
+    },
+    "change": {
+      "$ref": "#/$defs/ChangeRef"
+    },
+    "event_id": {
+      "format": "uuid",
+      "title": "Event Id",
+      "type": "string"
+    },
+    "fingerprint": {
+      "title": "Fingerprint",
+      "type": "string"
+    },
+    "lock_id": {
+      "title": "Lock Id",
+      "type": "string"
+    },
+    "occurred_at": {
+      "format": "date-time",
+      "title": "Occurred At",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "1",
+      "default": "1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "type": {
+      "const": "regression.detected",
+      "default": "regression.detected",
+      "title": "Type",
+      "type": "string"
+    }
+  },
+  "required": [
+    "change",
+    "bug_id",
+    "lock_id",
+    "fingerprint"
+  ],
+  "title": "RegressionDetected",
+  "type": "object"
+}

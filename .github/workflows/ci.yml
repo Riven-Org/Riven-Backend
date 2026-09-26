@@ -23,6 +23,12 @@ jobs:
       - run: uv run ruff format --check .
       - run: uv run mypy apps/api/src apps/worker/src packages/schemas/src
       - run: uv run pytest
+      - name: Export contracts as JSON Schema
+        run: uv run python -m riven_schemas.export build/json-schema
+      - uses: actions/upload-artifact@v4
+        with:
+          name: json-schema
+          path: build/json-schema
 
   secrets:
     runs-on: ubuntu-latest

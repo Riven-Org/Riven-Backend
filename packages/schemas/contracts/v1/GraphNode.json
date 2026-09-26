@@ -1,0 +1,55 @@
+{
+  "$defs": {
+    "NodeKind": {
+      "description": "Causal graph node kinds (ticket S09.1).",
+      "enum": [
+        "requirement",
+        "change",
+        "module",
+        "symbol",
+        "bug",
+        "fix",
+        "test",
+        "decision"
+      ],
+      "title": "NodeKind",
+      "type": "string"
+    }
+  },
+  "description": "A causal graph node (graph service).",
+  "properties": {
+    "id": {
+      "title": "Id",
+      "type": "string"
+    },
+    "key": {
+      "title": "Key",
+      "type": "string"
+    },
+    "kind": {
+      "$ref": "#/$defs/NodeKind"
+    },
+    "label": {
+      "default": "",
+      "title": "Label",
+      "type": "string"
+    },
+    "org_id": {
+      "title": "Org Id",
+      "type": "string"
+    },
+    "properties": {
+      "additionalProperties": true,
+      "title": "Properties",
+      "type": "object"
+    }
+  },
+  "required": [
+    "id",
+    "org_id",
+    "kind",
+    "key"
+  ],
+  "title": "GraphNode",
+  "type": "object"
+}
