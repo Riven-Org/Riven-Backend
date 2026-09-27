@@ -1,0 +1,109 @@
+{
+  "realm": "riven",
+  "displayName": "Riven",
+  "enabled": true,
+  "sslRequired": "external",
+  "registrationAllowed": true,
+  "registrationEmailAsUsername": true,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "verifyEmail": true,
+  "resetPasswordAllowed": true,
+  "rememberMe": true,
+  "bruteForceProtected": true,
+  "failureFactor": 10,
+  "passwordPolicy": "length(12) and notUsername and notEmail",
+  "accessTokenLifespan": 300,
+  "ssoSessionIdleTimeout": 1800,
+  "ssoSessionMaxLifespan": 36000,
+  "revokeRefreshToken": true,
+  "refreshTokenMaxReuse": 0,
+  "otpPolicyType": "totp",
+  "otpPolicyAlgorithm": "HmacSHA1",
+  "otpPolicyDigits": 6,
+  "otpPolicyPeriod": 30,
+  "otpPolicyLookAheadWindow": 1,
+  "smtpServer": {
+    "host": "${RIVEN_SMTP_HOST:localhost}",
+    "port": "${RIVEN_SMTP_PORT:1025}",
+    "from": "no-reply@riven.local",
+    "fromDisplayName": "Riven"
+  },
+  "clients": [
+    {
+      "clientId": "riven-web",
+      "name": "Riven dashboard",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "frontchannelLogout": true,
+      "rootUrl": "${RIVEN_WEB_URL:http://localhost:5173}",
+      "redirectUris": ["${RIVEN_WEB_URL:http://localhost:5173}/*"],
+      "webOrigins": ["+"],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "${RIVEN_WEB_URL:http://localhost:5173}/*"
+      },
+      "protocolMappers": [
+        {
+          "name": "riven-api audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "riven-api",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "riven-api",
+      "name": "Riven API (user and session administration)",
+      "publicClient": false,
+      "secret": "${RIVEN_KEYCLOAK_API_SECRET:riven-dev-secret}",
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true
+    }
+  ],
+  "users": [
+    {
+      "username": "service-account-riven-api",
+      "enabled": true,
+      "serviceAccountClientId": "riven-api",
+      "clientRoles": {
+        "realm-management": ["view-users", "manage-users"]
+      }
+    }
+  ],
+  "identityProviders": [
+    {
+      "alias": "github",
+      "providerId": "github",
+      "displayName": "GitHub",
+      "enabled": true,
+      "trustEmail": true,
+      "config": {
+        "clientId": "${RIVEN_GITHUB_CLIENT_ID:not-configured}",
+        "clientSecret": "${RIVEN_GITHUB_CLIENT_SECRET:not-configured}",
+        "defaultScope": "user:email",
+        "syncMode": "IMPORT"
+      }
+    },
+    {
+      "alias": "google",
+      "providerId": "google",
+      "displayName": "Google",
+      "enabled": true,
+      "trustEmail": true,
+      "config": {
+        "clientId": "${RIVEN_GOOGLE_CLIENT_ID:not-configured}",
+        "clientSecret": "${RIVEN_GOOGLE_CLIENT_SECRET:not-configured}",
+        "defaultScope": "openid profile email",
+        "syncMode": "IMPORT"
+      }
+    }
+  ]
+}

@@ -6,18 +6,19 @@ install:        ## Install dependencies and git hooks
 
 dev:            ## Whole stack in Docker: infra, migrations, API, worker, relay, demo data
 	docker compose build api
-	docker compose up -d --wait postgres redis s3 temporal
+	docker compose up -d --wait postgres redis s3 temporal keycloak mailpit
 	docker compose --profile init run --rm storage-init
 	docker compose --profile init run --rm migrate
 	docker compose up -d --wait api worker relay temporal-ui
 	docker compose run --rm api python -m riven_db.seed
 	@echo "API http://localhost:8000/docs · Temporal UI http://localhost:8080 · S3 http://localhost:9000"
+	@echo "Keycloak http://localhost:8081 (admin/admin) · Mail http://localhost:8025"
 
 seed:           ## Load the demo org into the database from .env (idempotent)
 	uv run python -m riven_db.seed
 
 up:             ## Start only the infrastructure (Postgres, Redis, S3, Temporal) for local runs
-	docker compose up -d --wait postgres redis s3 temporal
+	docker compose up -d --wait postgres redis s3 temporal keycloak mailpit
 	docker compose --profile init run --rm --build storage-init
 
 down:           ## Stop the stack (data volumes are kept; `docker compose down -v` wipes them)
