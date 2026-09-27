@@ -163,3 +163,59 @@ async def accept(session: AsyncSession, token: str, user: User) -> OrgWithRole:
     joined = await membership(session, invitation.org_id, user.id)
     assert joined is not None
     return joined
+
+
+async def _owner_count(session: AsyncSession, org_id: str) -> int:
+    return int(
+        await session.scalar(
+            select(func.count())
+            .select_from(Membership)
+            .where(Membership.org_id == org_id, Membership.role == Role.OWNER.value)
+        )
+        or 0
+    )
+
+
+async def _member(session: AsyncSession, org_id: str, user_id: UUID) -> Membership:
+    found = await session.get(Membership, (org_id, user_id))
+    if found is None:
+        raise NotFound("member_not_found")
+    return found
+
+
+async def set_role(
+    session: AsyncSession, org_id: str, user_id: UUID, role: Role, actor_role: Role
+) -> Membership:
+    """Change a member's role. Only owners touch owners; the last owner stays an owner."""
+    target = await _member(session, org_id, user_id)
+    touches_owner = Role(target.role) is Role.OWNER or role is Role.OWNER
+    if touches_owner and actor_role is not Role.OWNER:
+        raise Forbidden("only_owners_manage_owners")
+    demotes_owner = Role(target.role) is Role.OWNER and role is not Role.OWNER
+    if demotes_owner and await _owner_count(session, org_id) <= 1:
+        raise Conflict("last_owner")
+    target.role = role.value
+    await session.flush()
+    return target
+
+
+async def remove_member(
+    session: AsyncSession, org_id: str, user_id: UUID, actor_role: Role
+) -> None:
+    target = await _member(session, org_id, user_id)
+    if Role(target.role) is Role.OWNER:
+        if actor_role is not Role.OWNER:
+            raise Forbidden("only_owners_manage_owners")
+        if await _owner_count(session, org_id) <= 1:
+            raise Conflict("last_owner")
+    await session.delete(target)
+    await session.flush()
+
+
+async def rename(session: AsyncSession, org_id: str, name: str) -> Organization:
+    org = await session.get(Organization, org_id)
+    if org is None:
+        raise NotFound("org_not_found")
+    org.name = name.strip()
+    await session.flush()
+    return org

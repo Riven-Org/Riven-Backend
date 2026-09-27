@@ -9,8 +9,10 @@ from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from riven_api.auth.access import PermissionedRoute, Requires
 from riven_api.auth.deps import CurrentPrincipal
-from riven_api.auth.org import CurrentOrg, TenantSession
+from riven_api.auth.org import OrgContext, TenantSession
+from riven_api.auth.permissions import MATRIX, Permission
 from riven_api.config import get_settings
 from riven_api.db import get_session
 from riven_api.services import orgs
@@ -18,9 +20,9 @@ from riven_api.services.mail import Mailer, get_mailer
 from riven_db.models import Repository, User
 from riven_schemas import Role
 
-router = APIRouter(prefix="/v1", tags=["organizations"])
+router = APIRouter(prefix="/v1", tags=["organizations"], route_class=PermissionedRoute)
 Session = Annotated[AsyncSession, Depends(get_session)]
-MANAGERS = {Role.OWNER, Role.ADMIN}
+P = Permission
 
 
 class OrgIn(BaseModel):
@@ -33,11 +35,27 @@ class OrgOut(BaseModel):
     slug: str
     role: Role
     require_mfa: bool
+    permissions: list[Permission] = Field(description="What the caller may do in this org")
 
     @classmethod
     def of(cls, found: orgs.OrgWithRole) -> "OrgOut":
         o = found.org
-        return cls(id=o.id, name=o.name, slug=o.slug, role=found.role, require_mfa=o.require_mfa)
+        return cls(
+            id=o.id,
+            name=o.name,
+            slug=o.slug,
+            role=found.role,
+            require_mfa=o.require_mfa,
+            permissions=sorted(MATRIX[found.role]),
+        )
+
+
+class OrgUpdate(BaseModel):
+    name: str = Field(min_length=2, max_length=200)
+
+
+class RoleIn(BaseModel):
+    role: Role
 
 
 class MemberOut(BaseModel):
@@ -71,9 +89,13 @@ class RepositoryOut(BaseModel):
     default_branch: str
 
 
-def _require_manager(ctx: CurrentOrg) -> None:
-    if ctx.role not in MANAGERS:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, detail="forbidden")
+def _raise(exc: Exception) -> HTTPException:
+    code = {
+        orgs.NotFound: status.HTTP_404_NOT_FOUND,
+        orgs.Forbidden: status.HTTP_403_FORBIDDEN,
+        orgs.Conflict: status.HTTP_409_CONFLICT,
+    }[type(exc)]
+    return HTTPException(code, detail=str(exc))
 
 
 @router.post("/orgs", status_code=status.HTTP_201_CREATED)
@@ -91,12 +113,23 @@ async def list_orgs(principal: CurrentPrincipal, session: Session) -> list[OrgOu
 
 
 @router.get("/orgs/{org_id}")
-async def get_org(ctx: CurrentOrg) -> OrgOut:
+async def get_org(ctx: Annotated[OrgContext, Requires(P.ORG_READ)]) -> OrgOut:
     return OrgOut.of(orgs.OrgWithRole(ctx.org, ctx.role))
 
 
+@router.patch("/orgs/{org_id}")
+async def rename_org(
+    body: OrgUpdate, ctx: Annotated[OrgContext, Requires(P.ORG_UPDATE)], session: Session
+) -> OrgOut:
+    org = await orgs.rename(session, ctx.org_id, body.name)
+    await session.commit()
+    return OrgOut.of(orgs.OrgWithRole(org, ctx.role))
+
+
 @router.get("/orgs/{org_id}/members")
-async def list_members(ctx: CurrentOrg, session: Session) -> list[MemberOut]:
+async def list_members(
+    ctx: Annotated[OrgContext, Requires(P.MEMBERS_READ)], session: Session
+) -> list[MemberOut]:
     return [
         MemberOut(
             user_id=user.id,
@@ -109,15 +142,49 @@ async def list_members(ctx: CurrentOrg, session: Session) -> list[MemberOut]:
     ]
 
 
+@router.patch("/orgs/{org_id}/members/{user_id}")
+async def change_role(
+    user_id: UUID,
+    body: RoleIn,
+    ctx: Annotated[OrgContext, Requires(P.MEMBERS_UPDATE_ROLE)],
+    session: Session,
+) -> MemberOut:
+    try:
+        membership = await orgs.set_role(session, ctx.org_id, user_id, body.role, ctx.role)
+    except (orgs.NotFound, orgs.Forbidden, orgs.Conflict) as exc:
+        raise _raise(exc) from exc
+    await session.commit()
+    user = await session.get(User, user_id)
+    assert user is not None
+    return MemberOut(
+        user_id=user.id,
+        email=user.email,
+        name=user.name,
+        role=Role(membership.role),
+        joined_at=membership.created_at,
+    )
+
+
+@router.delete("/orgs/{org_id}/members/{user_id}", status_code=204)
+async def remove_member(
+    user_id: UUID, ctx: Annotated[OrgContext, Requires(P.MEMBERS_REMOVE)], session: Session
+) -> Response:
+    try:
+        await orgs.remove_member(session, ctx.org_id, user_id, ctx.role)
+    except (orgs.NotFound, orgs.Forbidden, orgs.Conflict) as exc:
+        raise _raise(exc) from exc
+    await session.commit()
+    return Response(status_code=204)
+
+
 @router.post("/orgs/{org_id}/invitations", status_code=status.HTTP_201_CREATED)
 async def invite(
     body: InviteIn,
-    ctx: CurrentOrg,
+    ctx: Annotated[OrgContext, Requires(P.MEMBERS_INVITE)],
     session: Session,
     mailer: Annotated[Mailer, Depends(get_mailer)],
 ) -> InvitationOut:
     """Invite someone by email; they join with `role` when they accept."""
-    _require_manager(ctx)
     if body.role is Role.OWNER and ctx.role is not Role.OWNER:
         raise HTTPException(status.HTTP_403_FORBIDDEN, detail="only_owners_invite_owners")
     try:
@@ -141,8 +208,9 @@ async def invite(
 
 
 @router.get("/orgs/{org_id}/invitations")
-async def list_invitations(ctx: CurrentOrg, session: Session) -> list[InvitationOut]:
-    _require_manager(ctx)
+async def list_invitations(
+    ctx: Annotated[OrgContext, Requires(P.MEMBERS_INVITE)], session: Session
+) -> list[InvitationOut]:
     return [
         InvitationOut(id=i.id, email=i.email, role=Role(i.role), expires_at=i.expires_at)
         for i in await orgs.pending_invitations(session, ctx.org_id)
@@ -150,8 +218,9 @@ async def list_invitations(ctx: CurrentOrg, session: Session) -> list[Invitation
 
 
 @router.delete("/orgs/{org_id}/invitations/{invitation_id}", status_code=204)
-async def revoke_invitation(invitation_id: UUID, ctx: CurrentOrg, session: Session) -> Response:
-    _require_manager(ctx)
+async def revoke_invitation(
+    invitation_id: UUID, ctx: Annotated[OrgContext, Requires(P.MEMBERS_INVITE)], session: Session
+) -> Response:
     try:
         await orgs.revoke_invitation(session, ctx.org_id, invitation_id)
     except orgs.NotFound as exc:
@@ -178,7 +247,9 @@ async def accept_invitation(
 
 
 @router.get("/orgs/{org_id}/repositories")
-async def list_repositories(session: TenantSession) -> list[RepositoryOut]:
+async def list_repositories(
+    _: Annotated[OrgContext, Requires(P.REPOS_READ)], session: TenantSession
+) -> list[RepositoryOut]:
     """Repositories of the org (read through row-level security)."""
     repos = await session.scalars(select(Repository).order_by(Repository.full_name))
     return [

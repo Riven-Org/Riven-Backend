@@ -47,3 +47,19 @@ exists. The identity service always filters them explicitly.
   file mentions the graph tables or models.
 - `test_cross_tenant.py` discovers every `/v1/orgs/{org_id}` endpoint from the OpenAPI schema
   and calls it as a member of another org; anything but 403/404 fails CI.
+
+## Roles and permissions (S03.3)
+
+- Five roles, nested: **viewer** (read) ⊂ **reviewer** (+ confirm bugs, approve reviews) ⊂
+  **maintainer** (+ submit changes, manage repos, create locks, see API keys) ⊂ **admin**
+  (+ members, API keys, security policy, retire locks, audit) ⊂ **owner** (everything,
+  including deleting the org). The matrix is code (`riven_api.auth.permissions`) and
+  documentation (`docs/permissions.md`, generated; a test fails when stale). Casbin was not
+  needed for a static matrix.
+- **Deny by default:** `PermissionedRoute` refuses to build a `/v1` route that does not
+  declare `require(Permission.…)`, depend on the caller only (`authenticated`), or mark itself
+  public. The declaration is published as `x-riven-permission` in OpenAPI, and a test calls
+  every org endpoint as every role that lacks its permission and expects 403.
+- Only owners manage owners, and an org always keeps one owner.
+- Org responses include the caller's `permissions`, so the dashboard hides actions without
+  re-implementing the rules; the API stays the authority.

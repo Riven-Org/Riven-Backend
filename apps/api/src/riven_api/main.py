@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from riven_api.auth.access import PermissionedRoute
 from riven_api.config import get_settings
 from riven_api.routers import health, me, orgs
 from riven_schemas import SCHEMA_VERSION
@@ -9,6 +10,7 @@ from riven_schemas import SCHEMA_VERSION
 def create_app() -> FastAPI:
     settings = get_settings()
     app = FastAPI(title="Riven API", version="0.1.0")
+    app.router.route_class = PermissionedRoute
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,
@@ -19,7 +21,7 @@ def create_app() -> FastAPI:
     app.include_router(me.router)
     app.include_router(orgs.router)
 
-    @app.get("/v1/meta")
+    @app.get("/v1/meta", openapi_extra={"x-riven-public": True})
     async def meta() -> dict[str, str]:
         return {"env": settings.env.value, "schema_version": SCHEMA_VERSION}
 
