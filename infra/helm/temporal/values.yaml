@@ -1,0 +1,117 @@
+# Base values for Riven Temporal staging cluster deployment (ticket S01.2.1)
+temporal:
+  enabled: true
+
+server:
+  replicaCount: 1
+  image:
+    repository: temporalio/server
+    tag: 1.24.2
+    pullPolicy: IfNotPresent
+
+  config:
+    numHistoryShards: 512
+    persistence:
+      default:
+        driver: "sql"
+        sql:
+          pluginName: "postgres12"
+          database: "riven_temporal_staging"
+          user: "riven_staging"
+          existingSecret: "temporal-db-secret"
+          userKey: "username"
+          passwordKey: "password"
+          host: "staging-postgres.internal"
+          port: 5432
+          maxConns: 20
+          maxIdleConns: 10
+          maxConnLifetime: "1h"
+      visibility:
+        driver: "sql"
+        sql:
+          pluginName: "postgres12"
+          database: "riven_temporal_visibility_staging"
+          user: "riven_staging"
+          existingSecret: "temporal-db-secret"
+          userKey: "username"
+          passwordKey: "password"
+          host: "staging-postgres.internal"
+          port: 5432
+          maxConns: 10
+          maxIdleConns: 5
+          maxConnLifetime: "1h"
+
+  frontend:
+    replicaCount: 1
+    resources:
+      requests:
+        cpu: 200m
+        memory: 512Mi
+      limits:
+        cpu: 1000m
+        memory: 1Gi
+    service:
+      type: ClusterIP
+      port: 7233
+
+  history:
+    replicaCount: 1
+    resources:
+      requests:
+        cpu: 250m
+        memory: 512Mi
+      limits:
+        cpu: 1000m
+        memory: 1Gi
+
+  matching:
+    replicaCount: 1
+    resources:
+      requests:
+        cpu: 200m
+        memory: 512Mi
+      limits:
+        cpu: 1000m
+        memory: 1Gi
+
+  worker:
+    replicaCount: 1
+    resources:
+      requests:
+        cpu: 150m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+
+web:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: temporalio/ui
+    tag: 2.26.2
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 8080
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+  ingress:
+    enabled: true
+    className: nginx
+    hosts:
+      - host: temporal.staging.riven.internal
+        paths:
+          - path: /
+            pathType: Prefix
+
+admintools:
+  enabled: true
+  image:
+    repository: temporalio/admin-tools
+    tag: 1.24.2

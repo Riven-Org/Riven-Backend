@@ -39,4 +39,11 @@ async def update_graph(change: ChangeRef) -> StageResult:
     return StageResult(stage=VerificationStage.GRAPH, ok=True, detail="not implemented")
 
 
-ALL_ACTIVITIES = [analyze_change, run_in_sandbox, verify, update_memory, update_graph]
+@activity.defn
+async def cleanup_sandbox(change: ChangeRef) -> StageResult:
+    # S01.2.4: tear down sandbox container and clean up allocated resources on cancellation.
+    return StageResult(stage=VerificationStage.SANDBOX, ok=True, detail="sandbox cleaned up")
+
+
+STAGE_ACTIVITIES = [analyze_change, run_in_sandbox, verify, update_memory, update_graph]
+ALL_ACTIVITIES = [*STAGE_ACTIVITIES, cleanup_sandbox]

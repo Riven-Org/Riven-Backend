@@ -1,0 +1,48 @@
+# Staging overrides for Temporal cluster (ticket S01.2.1)
+server:
+  replicaCount: 2
+  config:
+    numHistoryShards: 512
+    persistence:
+      default:
+        sql:
+          database: "riven_temporal_staging"
+          host: "staging-postgres.internal"
+          port: 5432
+      visibility:
+        sql:
+          database: "riven_temporal_visibility_staging"
+          host: "staging-postgres.internal"
+          port: 5432
+
+  frontend:
+    replicaCount: 2
+    autoscaling:
+      enabled: true
+      minReplicas: 2
+      maxReplicas: 5
+      targetCPUUtilizationPercentage: 75
+
+  history:
+    replicaCount: 2
+
+  matching:
+    replicaCount: 2
+
+web:
+  enabled: true
+  replicaCount: 1
+  ingress:
+    enabled: true
+    className: nginx
+    annotations:
+      cert-manager.io/cluster-issuer: "letsencrypt-staging"
+    hosts:
+      - host: temporal.staging.riven.internal
+        paths:
+          - path: /
+            pathType: Prefix
+    tls:
+      - secretName: temporal-ui-staging-tls
+        hosts:
+          - temporal.staging.riven.internal
