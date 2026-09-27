@@ -23,7 +23,7 @@ def _baseline(name: str) -> dict[str, object]:
     path = snapshot_dir() / f"{name}.json"
     if not path.exists():
         pytest.fail(f"No baseline for {name}: run `{SNAPSHOT_CMD}`")
-    loaded: dict[str, object] = json.loads(path.read_text())
+    loaded: dict[str, object] = json.loads(path.read_text(encoding="utf-8"))
     return loaded
 
 
@@ -48,7 +48,7 @@ def test_export_writes_one_json_schema_per_contract(tmp_path: Path) -> None:
     written = write(out)
 
     assert {p.stem for p in written} == set(CONTRACTS)
-    assert json.loads((out / "Change.json").read_text())["title"] == "Change"
+    assert json.loads((out / "Change.json").read_text(encoding="utf-8"))["title"] == "Change"
 
 
 # --- the checker itself -------------------------------------------------------------------
@@ -160,6 +160,66 @@ def test_event_catalog_doc_is_up_to_date() -> None:
 
     doc = Path(__file__).resolve().parents[3] / "docs" / "events.md"
 
-    assert doc.read_text() == render(), (
+    assert doc.read_text(encoding="utf-8") == render(), (
         "docs/events.md is stale: uv run python -m riven_schemas.catalog > docs/events.md"
     )
+
+
+def test_changing_array_item_type_is_breaking() -> None:
+    class OldArray(BaseModel):
+        tags: list[str]
+
+    class NewArray(BaseModel):
+        tags: list[int]
+
+    assert breaking_changes(_schema(OldArray), _schema(NewArray)) == [
+        "$.tags[]: type 'string' is no longer accepted"
+    ]
+
+
+def test_required_story_models_are_registered_as_contracts() -> None:
+    """Verify ticket S01.1.3 explicitly required entities and domain events."""
+    required_entities = {"Change", "VerificationRun", "Bug", "RegressionLock", "GraphEdge"}
+    required_events = {
+        "ChangeCaptured",
+        "VerificationCompleted",
+        "BugConfirmed",
+        "RegressionDetected",
+        "LockCreated",
+    }
+    registered = set(CONTRACTS)
+    missing = (required_entities | required_events) - registered
+    assert missing == set(), f"Required models missing from CONTRACTS registry: {missing}"
+
+
+def test_every_service_boundary_has_a_merged_adr() -> None:
+    """Verify S01.1.1: One ADR per service: responsibility, owned tables, published events."""
+    repo_root = Path(__file__).resolve().parents[3]
+    adr_dir = repo_root / "docs" / "adr"
+    decomp_adr = adr_dir / "0002-service-decomposition.md"
+
+    assert decomp_adr.exists(), "ADR 0002 (service decomposition) must exist"
+    decomp_content = decomp_adr.read_text(encoding="utf-8")
+
+    expected_services = [
+        ("api-gateway", "0003-service-api-gateway.md"),
+        ("capture", "0004-service-capture.md"),
+        ("orchestrator", "0005-service-orchestrator.md"),
+        ("sandbox-runner", "0006-service-sandbox-runner.md"),
+        ("verifier", "0007-service-verifier.md"),
+        ("memory", "0008-service-memory.md"),
+        ("graph", "0009-service-graph.md"),
+        ("web", "0010-service-web.md"),
+    ]
+
+    for service_name, adr_filename in expected_services:
+        assert service_name in decomp_content, f"ADR 0002 must list service {service_name}"
+        service_adr = adr_dir / adr_filename
+        assert service_adr.exists(), f"Service ADR {adr_filename} must exist"
+        content = service_adr.read_text(encoding="utf-8")
+        assert "## Responsibility" in content, f"{adr_filename} must define Responsibility"
+        assert "## Runs in" in content, f"{adr_filename} must define Runs in"
+        assert "## Owns" in content, f"{adr_filename} must define Owns"
+        assert "## Publishes" in content, f"{adr_filename} must define Publishes"
+        assert "## Consumes" in content, f"{adr_filename} must define Consumes"
+        assert "## Does not" in content, f"{adr_filename} must define Does not"

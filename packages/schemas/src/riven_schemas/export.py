@@ -24,7 +24,7 @@ def write(out: Path) -> list[Path]:
     written = []
     for name, schema in sorted(json_schemas().items()):
         path = out / f"{name}.json"
-        path.write_text(json.dumps(schema, indent=2, sort_keys=True) + "\n")
+        path.write_text(json.dumps(schema, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         written.append(path)
     return written
 
