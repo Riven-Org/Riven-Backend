@@ -69,8 +69,26 @@ jobs:
           docker compose run --rm api python -m riven_db.seed | grep -q "already present"
       - name: Temporal UI is reachable and sample workflow executes
         run: |
-          curl -fsS http://localhost:8080 | grep -qi "temporal"
-          docker compose exec -T worker python -c "import asyncio, uuid; from temporalio.client import Client; from temporalio.contrib.pydantic import pydantic_data_converter; from riven_worker.workflows import VerificationWorkflow; from riven_schemas import ChangeRef; async def run(): c = await Client.connect('temporal:7233', namespace='default', data_converter=pydantic_data_converter); res = await c.execute_workflow(VerificationWorkflow.run, ChangeRef(org_id='demo', repo='riven-demo/shop', commit_sha='abc123'), id=str(uuid.uuid4()), task_queue='verification'); assert res.status == 'passed'; asyncio.run(run())"
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080)" = 200
+          docker compose exec -T worker python -c "
+          import asyncio, uuid
+          from temporalio.client import Client
+          from temporalio.contrib.pydantic import pydantic_data_converter
+          from riven_worker.workflows import VerificationWorkflow
+          from riven_schemas import ChangeRef
+
+          async def run():
+              c = await Client.connect('temporal:7233', namespace='default', data_converter=pydantic_data_converter)
+              res = await c.execute_workflow(
+                  VerificationWorkflow.run,
+                  ChangeRef(org_id='demo', repo='riven-demo/shop', commit_sha='abc123'),
+                  id=str(uuid.uuid4()),
+                  task_queue='verification',
+              )
+              assert res.status == 'passed'
+
+          asyncio.run(run())
+          "
       - name: Logs on failure
         if: failure()
         run: docker compose logs --no-color --tail 200
