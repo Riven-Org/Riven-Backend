@@ -74,6 +74,16 @@ class NodeKind(StrEnum):
     DECISION = "decision"
 
 
+class Role(StrEnum):
+    """Org roles, most to least privileged (permission matrix: S03.3)."""
+
+    OWNER = "owner"
+    ADMIN = "admin"
+    MAINTAINER = "maintainer"
+    REVIEWER = "reviewer"
+    VIEWER = "viewer"
+
+
 class Producer(BaseModel):
     model_config = ConfigDict(frozen=True)
 

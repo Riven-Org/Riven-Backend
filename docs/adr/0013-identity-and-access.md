@@ -26,3 +26,24 @@
 Identity tables (`users`, and later memberships, invitations, service accounts, API keys) are
 global rather than row-level-secured: authentication must find them before an org context
 exists. The identity service always filters them explicitly.
+
+## Organizations and tenant isolation (S03.2)
+
+- An **organization** (`org_<hex>`) is the tenant. Users join through **memberships** with one
+  role; owners and admins invite by email (7-day, single-use token stored as a SHA-256 hash;
+  the invitee's email must match).
+- Org endpoints live under `/v1/orgs/{org_id}/…`. Non-members get **404**, the same as for an
+  org that does not exist, so ids cannot be probed.
+- **Postgres row-level security** on every tenant table (`riven_db.tenant_tables()`): policy
+  `tenant_isolation` compares `org_id` with `current_setting('app.org_id')`. Request
+  transactions of a `tenant_session` run `SET LOCAL ROLE riven_app` and set `app.org_id`
+  (a SQLAlchemy `after_begin` hook, so every transaction gets it and a pooled connection never
+  keeps it). Without an org context a query returns zero rows; writing another org's row
+  fails. System jobs (migrations, seed, relay, nightly checks) use the login role, which owns
+  the tables and is not subject to RLS. New tenant tables call `enable_rls()` in their
+  migration; a test fails otherwise.
+- **Graph access** goes only through `riven_db.graph_repository.GraphRepository(session,
+  org_id)`, which filters every query by org on top of RLS. A test fails if any other source
+  file mentions the graph tables or models.
+- `test_cross_tenant.py` discovers every `/v1/orgs/{org_id}` endpoint from the OpenAPI schema
+  and calls it as a member of another org; anything but 403/404 fails CI.

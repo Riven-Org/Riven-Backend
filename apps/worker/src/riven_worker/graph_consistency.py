@@ -9,9 +9,8 @@ Temporal UI); exporting it as a metric is S23.1.
 
 import contextlib
 import logging
-from datetime import UTC, datetime, timedelta
+from datetime import timedelta
 
-from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from temporalio import activity, workflow
 from temporalio.client import (
@@ -23,30 +22,16 @@ from temporalio.client import (
 )
 
 with workflow.unsafe.imports_passed_through():
+    from riven_db.graph_repository import count_orphaned_edges_all_orgs
     from riven_schemas import GraphConsistencyReport
 
 SCHEDULE_ID = "graph-consistency-nightly"
 NIGHTLY_CRON = "0 3 * * *"
 log = logging.getLogger(__name__)
 
-_ORPHANS_SQL = text(
-    """
-    SELECT count(*) AS checked,
-           count(*) FILTER (
-               WHERE s.id IS NULL OR t.id IS NULL OR s.org_id <> e.org_id OR t.org_id <> e.org_id
-           ) AS orphaned
-    FROM graph_edges e
-    LEFT JOIN graph_nodes s ON s.id = e.source_id
-    LEFT JOIN graph_nodes t ON t.id = e.target_id
-    """
-)
-
 
 async def count_orphaned_edges(session: AsyncSession) -> GraphConsistencyReport:
-    row = (await session.execute(_ORPHANS_SQL)).one()
-    return GraphConsistencyReport(
-        checked_edges=row.checked, orphaned_edges=row.orphaned, checked_at=datetime.now(UTC)
-    )
+    return await count_orphaned_edges_all_orgs(session)
 
 
 class GraphConsistencyActivities:

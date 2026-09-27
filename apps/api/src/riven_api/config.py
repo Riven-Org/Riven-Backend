@@ -15,6 +15,11 @@ class Settings(DatabaseSettings, RedisSettings, TemporalSettings):
     oidc_issuer: str = "http://localhost:8081/realms/riven"
     oidc_audience: str = "riven-api"
     oidc_jwks_url_override: str | None = None
+    # Links in emails point at the dashboard; mail goes out over SMTP (Mailpit in dev).
+    web_url: str = "http://localhost:5173"
+    smtp_host: str = "localhost"
+    smtp_port: int = 1025
+    mail_from: str = "Riven <no-reply@riven.local>"
 
     @property
     def oidc_jwks_url(self) -> str:
