@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from riven_api.config import get_settings
-from riven_api.routers import health
+from riven_api.routers import health, me
 from riven_schemas import SCHEMA_VERSION
 
 
@@ -16,6 +16,7 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
     app.include_router(health.router)
+    app.include_router(me.router)
 
     @app.get("/v1/meta")
     async def meta() -> dict[str, str]:

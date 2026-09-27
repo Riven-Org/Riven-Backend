@@ -59,10 +59,12 @@ jobs:
         run: |
           docker compose ps
           test -z "$(docker compose ps --format '{{.Name}} {{.Health}}' | grep -E 'unhealthy|starting')"
-          test "$(docker compose ps --services --status running | wc -l)" -ge 8
+          test "$(docker compose ps --services --status running | wc -l)" -ge 10
       - name: API is ready and demo data is loaded
         run: |
           curl -fsS http://localhost:8000/health/ready
+          curl -fsS http://localhost:8081/realms/riven/.well-known/openid-configuration | grep -q '"issuer":"http://localhost:8081/realms/riven"'
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8000/v1/me)" = 401
           test "$(docker compose exec -T postgres psql -U riven -tAc 'select count(*) from changes')" = 5
           docker compose run --rm api python -m riven_db.seed | grep -q "already present"
       - name: Logs on failure

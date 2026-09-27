@@ -1,7 +1,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import DateTime, String, func, text
+from sqlalchemy import DateTime, String, Table, func, text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -18,3 +18,9 @@ class TenantMixin:
 
 def uuid_pk() -> Mapped[UUID]:
     return mapped_column(primary_key=True, server_default=text("gen_random_uuid()"))
+
+
+def tenant_tables() -> list[Table]:
+    """Domain tables scoped by org (row-level-secured from S03.2); identity tables opt out
+    with `info={"tenant_scoped": False}`."""
+    return [t for t in Base.metadata.sorted_tables if t.info.get("tenant_scoped", True)]

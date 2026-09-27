@@ -2,6 +2,7 @@
 indexed org_id. Needs Postgres (RIVEN_TEST_DATABASE_URL)."""
 
 import asyncio
+from pathlib import Path
 from typing import Any
 
 from alembic import command
@@ -12,7 +13,7 @@ from sqlalchemy import Connection, inspect
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 from sqlalchemy.pool import NullPool
 
-from riven_db import Base
+from riven_db import Base, tenant_tables
 from riven_events import EventsBase
 
 import riven_db.models  # noqa: F401  isort: skip
@@ -36,7 +37,7 @@ async def test_fresh_database_at_head_matches_the_models(db_engine: AsyncEngine)
 def _org_id_report(connection: Connection) -> dict[str, str]:
     inspector = inspect(connection)
     problems = {}
-    for table in Base.metadata.sorted_tables:
+    for table in tenant_tables():
         columns = {c["name"]: c for c in inspector.get_columns(table.name)}
         if "org_id" not in columns:
             problems[table.name] = "no org_id column"
@@ -53,14 +54,12 @@ async def test_every_domain_table_has_an_indexed_non_null_org_id(db_engine: Asyn
     async with db_engine.connect() as conn:
         problems = await conn.run_sync(_org_id_report)
 
-    assert len(Base.metadata.sorted_tables) >= 8
+    assert len(tenant_tables()) >= 8
     assert problems == {}
 
 
 def test_migrations_downgrade_to_base_and_upgrade_again(migrated_database: str) -> None:
-    from conftest import ALEMBIC_INI
-
-    config = Config(str(ALEMBIC_INI))
+    config = Config(str(Path(__file__).resolve().parents[3] / "apps/api/alembic.ini"))
     config.set_main_option("sqlalchemy.url", migrated_database)
 
     command.downgrade(config, "base")
