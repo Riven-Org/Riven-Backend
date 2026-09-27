@@ -10,6 +10,7 @@ resolution-markers = [
 members = [
     "riven",
     "riven-api",
+    "riven-config",
     "riven-db",
     "riven-events",
     "riven-schemas",
@@ -1370,6 +1371,7 @@ dev = [
     { name = "pytest" },
     { name = "pytest-asyncio" },
     { name = "riven-api" },
+    { name = "riven-config" },
     { name = "riven-db" },
     { name = "riven-events" },
     { name = "riven-schemas" },
@@ -1389,6 +1391,7 @@ dev = [
     { name = "pytest", specifier = ">=8.3" },
     { name = "pytest-asyncio", specifier = ">=0.24" },
     { name = "riven-api", editable = "apps/api" },
+    { name = "riven-config", editable = "packages/config" },
     { name = "riven-db", editable = "packages/db" },
     { name = "riven-events", editable = "packages/events" },
     { name = "riven-schemas", editable = "packages/schemas" },
@@ -1407,7 +1410,7 @@ dependencies = [
     { name = "fastapi" },
     { name = "httpx" },
     { name = "pgvector" },
-    { name = "pydantic-settings" },
+    { name = "riven-config" },
     { name = "riven-db" },
     { name = "riven-events" },
     { name = "riven-schemas" },
@@ -1423,7 +1426,7 @@ requires-dist = [
     { name = "fastapi", specifier = ">=0.115" },
     { name = "httpx", specifier = ">=0.27" },
     { name = "pgvector", specifier = ">=0.3" },
-    { name = "pydantic-settings", specifier = ">=2.4" },
+    { name = "riven-config", editable = "packages/config" },
     { name = "riven-db", editable = "packages/db" },
     { name = "riven-events", editable = "packages/events" },
     { name = "riven-schemas", editable = "packages/schemas" },
@@ -1433,12 +1436,23 @@ requires-dist = [
 ]
 
 [[package]]
+name = "riven-config"
+version = "0.1.0"
+source = { editable = "packages/config" }
+dependencies = [
+    { name = "pydantic-settings" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "pydantic-settings", specifier = ">=2.4" }]
+
+[[package]]
 name = "riven-db"
 version = "0.1.0"
 source = { editable = "packages/db" }
 dependencies = [
     { name = "asyncpg" },
-    { name = "pydantic-settings" },
+    { name = "riven-config" },
     { name = "riven-schemas" },
     { name = "sqlalchemy", extra = ["asyncio"] },
 ]
@@ -1446,7 +1460,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "asyncpg", specifier = ">=0.29" },
-    { name = "pydantic-settings", specifier = ">=2.4" },
+    { name = "riven-config", editable = "packages/config" },
     { name = "riven-schemas", editable = "packages/schemas" },
     { name = "sqlalchemy", extras = ["asyncio"], specifier = ">=2.0" },
 ]
@@ -1457,8 +1471,8 @@ version = "0.1.0"
 source = { editable = "packages/events" }
 dependencies = [
     { name = "asyncpg" },
-    { name = "pydantic-settings" },
     { name = "redis" },
+    { name = "riven-config" },
     { name = "riven-schemas" },
     { name = "sqlalchemy", extra = ["asyncio"] },
 ]
@@ -1466,8 +1480,8 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "asyncpg", specifier = ">=0.29" },
-    { name = "pydantic-settings", specifier = ">=2.4" },
     { name = "redis", specifier = ">=5.0" },
+    { name = "riven-config", editable = "packages/config" },
     { name = "riven-schemas", editable = "packages/schemas" },
     { name = "sqlalchemy", extras = ["asyncio"], specifier = ">=2.0" },
 ]
@@ -1489,13 +1503,13 @@ version = "0.1.0"
 source = { editable = "packages/storage" }
 dependencies = [
     { name = "boto3" },
-    { name = "pydantic-settings" },
+    { name = "riven-config" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "boto3", specifier = ">=1.34" },
-    { name = "pydantic-settings", specifier = ">=2.4" },
+    { name = "riven-config", editable = "packages/config" },
 ]
 
 [[package]]
@@ -1503,7 +1517,7 @@ name = "riven-worker"
 version = "0.1.0"
 source = { editable = "apps/worker" }
 dependencies = [
-    { name = "pydantic-settings" },
+    { name = "riven-config" },
     { name = "riven-db" },
     { name = "riven-events" },
     { name = "riven-schemas" },
@@ -1513,7 +1527,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
-    { name = "pydantic-settings", specifier = ">=2.4" },
+    { name = "riven-config", editable = "packages/config" },
     { name = "riven-db", editable = "packages/db" },
     { name = "riven-events", editable = "packages/events" },
     { name = "riven-schemas", editable = "packages/schemas" },

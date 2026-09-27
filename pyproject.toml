@@ -6,13 +6,14 @@ requires-python = ">=3.12"
 dependencies = []
 
 [tool.uv.workspace]
-members = ["apps/api", "apps/worker", "packages/schemas", "packages/events", "packages/db", "packages/storage"]
+members = ["apps/api", "apps/worker", "packages/schemas", "packages/events", "packages/db", "packages/storage", "packages/config"]
 
 [tool.uv.sources]
 riven-schemas = { workspace = true }
 riven-events = { workspace = true }
 riven-db = { workspace = true }
 riven-storage = { workspace = true }
+riven-config = { workspace = true }
 riven-api = { workspace = true }
 riven-worker = { workspace = true }
 
@@ -22,6 +23,7 @@ dev = [
     "riven-events",
     "riven-db",
     "riven-storage",
+    "riven-config",
     "riven-api",
     "riven-worker",
     "ruff>=0.6",
@@ -45,7 +47,7 @@ select = ["E", "F", "I", "B", "UP", "SIM", "ASYNC"]
 "apps/api/alembic/versions/*" = ["E501"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["riven_api", "riven_worker", "riven_schemas", "riven_events", "riven_db", "riven_storage"]
+known-first-party = ["riven_api", "riven_worker", "riven_schemas", "riven_events", "riven_db", "riven_storage", "riven_config"]
 
 [tool.mypy]
 python_version = "3.12"
@@ -59,4 +61,4 @@ ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
-testpaths = ["apps/api/tests", "apps/worker/tests", "packages/schemas/tests", "packages/events/tests", "packages/db/tests", "packages/storage/tests"]
+testpaths = ["apps/api/tests", "apps/worker/tests", "packages/schemas/tests", "packages/events/tests", "packages/db/tests", "packages/storage/tests", "packages/config/tests"]

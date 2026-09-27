@@ -77,9 +77,9 @@ class OutboxRelay:
 
 async def main() -> None:
     logging.basicConfig(level=logging.INFO)
-    settings = EventSettings()
-    engine = create_async_engine(settings.database_url, pool_pre_ping=True)
-    redis = Redis.from_url(settings.redis_url, decode_responses=True)
+    settings = EventSettings.load()
+    engine = create_async_engine(settings.database_url.get_secret_value(), pool_pre_ping=True)
+    redis = Redis.from_url(settings.redis_url.get_secret_value(), decode_responses=True)
     relay = OutboxRelay(async_sessionmaker(engine, expire_on_commit=False), redis)
     log.info("outbox relay publishing to %s", STREAM)
     await relay.run(poll_seconds=settings.outbox_poll_seconds)
