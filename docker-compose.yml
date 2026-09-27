@@ -79,7 +79,9 @@ services:
       RIVEN_SMTP_PORT: "1025"
       RIVEN_WEB_URL: http://localhost:5173
     ports: ["8081:8080"]
-    volumes: ["./infra/keycloak:/opt/keycloak/data/import:ro"]
+    volumes:
+      - ./infra/keycloak/realm-riven.json:/opt/keycloak/data/import/realm-riven.json:ro
+      - ./infra/keycloak/themes/riven:/opt/keycloak/themes/riven:ro
     healthcheck:
       test:
         - CMD-SHELL

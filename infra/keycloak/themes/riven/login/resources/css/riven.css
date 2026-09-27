@@ -1,0 +1,594 @@
+/* Riven login theme — tokens mirror Riven-Frontend/src/styles/tokens.css. */
+
+@font-face {
+  font-family: 'Instrument Sans Variable';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400 700;
+  src: url('../fonts/instrument-sans.woff2') format('woff2-variations');
+}
+
+:root {
+  --r-canvas: #fafaf8;
+  --r-surface: #ffffff;
+  --r-sunken: #f5f5f2;
+  --r-border: #e6e6e1;
+  --r-border-strong: #d4d4ce;
+  --r-text: #18181b;
+  --r-muted: #73737b;
+  --r-accent: #4f53d9;
+  --r-accent-hover: #4246c6;
+  --r-accent-text: #3f43c2;
+  --r-accent-subtle: #eeeefc;
+  --r-danger: #c53a31;
+  --r-danger-subtle: #fcecea;
+  --r-success: #17804f;
+  --r-success-subtle: #e8f4ed;
+  --r-grid: rgba(24, 24, 27, 0.05);
+  --r-glow: rgba(79, 83, 217, 0.1);
+  --r-ring: 0 0 0 3px rgba(79, 83, 217, 0.22);
+  --r-shadow: 0 1px 2px rgba(20, 20, 24, 0.05), 0 24px 48px -16px rgba(20, 20, 24, 0.14);
+  --r-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --r-font: 'Instrument Sans Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+.pf-v5-theme-dark {
+  --r-canvas: #0f1012;
+  --r-surface: #17181b;
+  --r-sunken: #1c1d21;
+  --r-border: #26272c;
+  --r-border-strong: #35363d;
+  --r-text: #ececef;
+  --r-muted: #8f8f98;
+  --r-accent: #5a5ee6;
+  --r-accent-hover: #6a6ef0;
+  --r-accent-text: #a1a4fb;
+  --r-accent-subtle: #1f2145;
+  --r-danger: #f0736b;
+  --r-danger-subtle: rgba(240, 115, 107, 0.12);
+  --r-success: #4cc38a;
+  --r-success-subtle: rgba(76, 195, 138, 0.12);
+  --r-grid: rgba(255, 255, 255, 0.04);
+  --r-glow: rgba(90, 94, 230, 0.16);
+  --r-ring: 0 0 0 3px rgba(129, 133, 245, 0.3);
+  --r-shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 24px 48px -16px rgba(0, 0, 0, 0.7);
+}
+
+:root,
+.pf-v5-theme-dark {
+  --pf-v5-global--FontFamily--text: var(--r-font);
+  --pf-v5-global--FontFamily--heading: var(--r-font);
+  --pf-v5-global--FontFamily--text--vf: var(--r-font);
+  --pf-v5-global--FontFamily--heading--vf: var(--r-font);
+  --pf-v5-global--link--Color: var(--r-accent-text);
+  --pf-v5-global--link--Color--hover: var(--r-accent-hover);
+  --pf-v5-global--primary-color--100: var(--r-accent);
+  --pf-v5-global--Color--100: var(--r-text);
+  --pf-v5-global--Color--200: var(--r-muted);
+  --pf-v5-global--BackgroundColor--100: var(--r-surface);
+  --pf-v5-global--BorderRadius--sm: 8px;
+  --pf-v5-c-button--BorderRadius: 8px;
+  --pf-v5-c-button--m-primary--BackgroundColor: var(--r-accent);
+  --pf-v5-c-button--m-primary--hover--BackgroundColor: var(--r-accent-hover);
+  --pf-v5-c-button--m-primary--focus--BackgroundColor: var(--r-accent-hover);
+  --pf-v5-c-button--m-primary--active--BackgroundColor: var(--r-accent-hover);
+  --pf-v5-c-button--m-primary--Color: #fff;
+  --pf-v5-c-button--m-secondary--BackgroundColor: var(--r-surface);
+  --pf-v5-c-button--m-secondary--Color: var(--r-text);
+  --pf-v5-c-button--m-secondary--after--BorderColor: var(--r-border);
+  --pf-v5-c-button--m-secondary--hover--BackgroundColor: var(--r-sunken);
+  --pf-v5-c-button--m-secondary--hover--Color: var(--r-text);
+  --pf-v5-c-button--m-secondary--hover--after--BorderColor: var(--r-border-strong);
+  --pf-v5-c-button--m-secondary--focus--after--BorderColor: var(--r-accent);
+  --pf-v5-c-form-control--BackgroundColor: var(--r-surface);
+  --pf-v5-c-form-control--Color: var(--r-text);
+  --pf-v5-c-form-control--before--BorderTopColor: var(--r-border);
+  --pf-v5-c-form-control--before--BorderRightColor: var(--r-border);
+  --pf-v5-c-form-control--before--BorderBottomColor: var(--r-border);
+  --pf-v5-c-form-control--before--BorderLeftColor: var(--r-border);
+  --pf-v5-c-form-control--after--BorderBottomColor: transparent;
+  --pf-v5-c-form-control--hover--after--BorderBottomColor: transparent;
+  --pf-v5-c-form-control--focus--after--BorderBottomColor: transparent;
+  --pf-v5-c-login__main--BackgroundColor: var(--r-surface);
+  --pf-v5-c-login__main--BoxShadow: var(--r-shadow);
+  --pf-v5-c-title--m-3xl--FontSize: 24px;
+}
+
+/* ---------- canvas: quiet grid with a slowly drifting glow ---------- */
+
+.login-pf body {
+  min-height: 100%;
+  background: var(--r-canvas);
+  color: var(--r-text);
+  font-family: var(--r-font);
+  -webkit-font-smoothing: antialiased;
+}
+
+.login-pf body::before,
+.login-pf body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.login-pf body::before {
+  background-image:
+    linear-gradient(var(--r-grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--r-grid) 1px, transparent 1px);
+  background-size: 40px 40px;
+  mask-image: radial-gradient(ellipse 70% 60% at 50% 38%, #000 30%, transparent 78%);
+  animation: riven-grid 40s linear infinite;
+}
+
+.login-pf body::after {
+  background:
+    radial-gradient(520px 360px at 30% 20%, var(--r-glow), transparent 70%),
+    radial-gradient(480px 360px at 75% 80%, var(--r-glow), transparent 70%);
+  animation: riven-glow 18s ease-in-out infinite alternate;
+}
+
+@keyframes riven-grid {
+  to {
+    background-position: 40px 40px;
+  }
+}
+
+@keyframes riven-glow {
+  from {
+    transform: translate3d(-2%, -1%, 0);
+  }
+  to {
+    transform: translate3d(2%, 2%, 0);
+  }
+}
+
+.pf-v5-c-login {
+  position: relative;
+  z-index: 1;
+  min-height: 100vh;
+  padding: 48px 16px;
+}
+
+.pf-v5-c-login__container {
+  grid-template-columns: minmax(0, 420px) !important;
+  justify-content: center;
+}
+
+/* ---------- brand ---------- */
+
+#kc-header {
+  justify-content: center;
+  margin-bottom: 20px;
+  animation: riven-rise 0.45s var(--r-ease) both;
+}
+
+#kc-header-wrapper {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--r-text);
+  font: 600 17px/1 var(--r-font);
+  letter-spacing: -0.01em;
+  text-transform: none;
+}
+
+#kc-header-wrapper::before {
+  content: '';
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: url('../img/riven-mark.svg') center / contain no-repeat;
+}
+
+.pf-v5-theme-dark #kc-header-wrapper::before {
+  filter: invert(1) hue-rotate(180deg);
+}
+
+/* ---------- card ---------- */
+
+.pf-v5-c-login__main {
+  border: 1px solid var(--r-border);
+  border-radius: 14px;
+  overflow: hidden;
+  animation: riven-rise 0.5s var(--r-ease) 0.05s both;
+}
+
+.pf-v5-c-login__main-header {
+  border-top: 0 !important;
+  padding: 32px 32px 4px !important;
+}
+
+#kc-page-title {
+  font: 600 24px/30px var(--r-font);
+  letter-spacing: -0.022em;
+  color: var(--r-text);
+}
+
+.pf-v5-c-login__main-body {
+  padding: 20px 32px 8px !important;
+}
+
+.pf-v5-c-login__main-footer {
+  padding: 0 32px 28px !important;
+}
+
+.pf-v5-c-login__main-footer-band {
+  border-top: 1px solid var(--r-border);
+  margin-top: 8px;
+  padding-top: 16px !important;
+  color: var(--r-muted);
+  font-size: 14px;
+}
+
+@keyframes riven-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Fields arrive one after another. */
+.pf-v5-c-form > * {
+  animation: riven-rise 0.4s var(--r-ease) both;
+}
+
+.pf-v5-c-form > *:nth-child(1) { animation-delay: 0.12s; }
+.pf-v5-c-form > *:nth-child(2) { animation-delay: 0.17s; }
+.pf-v5-c-form > *:nth-child(3) { animation-delay: 0.22s; }
+.pf-v5-c-form > *:nth-child(4) { animation-delay: 0.27s; }
+.pf-v5-c-form > *:nth-child(5) { animation-delay: 0.32s; }
+.pf-v5-c-form > *:nth-child(n + 6) { animation-delay: 0.36s; }
+
+/* ---------- form controls ---------- */
+
+.pf-v5-c-form__label-text {
+  font: 500 13px/18px var(--r-font);
+  color: var(--r-text);
+}
+
+.pf-v5-c-form-control {
+  min-height: 40px;
+  border-radius: 8px;
+  transition: box-shadow 0.15s var(--r-ease);
+}
+
+.pf-v5-c-form-control::before {
+  border-radius: 8px;
+  transition: border-color 0.15s var(--r-ease);
+}
+
+.pf-v5-c-form-control:hover::before {
+  border-color: var(--r-border-strong);
+}
+
+.pf-v5-c-form-control:focus-within {
+  box-shadow: var(--r-ring);
+}
+
+.pf-v5-c-form-control:focus-within::before {
+  border-color: var(--r-accent);
+}
+
+.pf-v5-c-form-control input,
+.pf-v5-c-form-control select {
+  font: 400 14.5px/20px var(--r-font);
+}
+
+.pf-v5-c-form-control.pf-m-error::before,
+.pf-v5-c-form-control[aria-invalid='true']::before {
+  border-color: var(--r-danger);
+}
+
+.pf-v5-c-helper-text__item.pf-m-error,
+.kc-feedback-text {
+  color: var(--r-danger);
+  font-size: 12.5px;
+}
+
+.pf-v5-c-check__input {
+  accent-color: var(--r-accent);
+}
+
+.pf-v5-c-check__label {
+  color: var(--r-muted);
+  font-size: 13.5px;
+}
+
+/* ---------- buttons ---------- */
+
+.pf-v5-c-button {
+  min-height: 40px;
+  font: 500 14px/1 var(--r-font);
+  transition:
+    background-color 0.15s var(--r-ease),
+    transform 0.12s var(--r-ease),
+    box-shadow 0.15s var(--r-ease);
+}
+
+.pf-v5-c-button:active {
+  transform: translateY(0.5px) scale(0.99);
+}
+
+.pf-v5-c-button.pf-m-primary {
+  box-shadow: 0 1px 2px rgba(20, 20, 24, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+.pf-v5-c-button:focus-visible {
+  outline: none;
+  box-shadow: var(--r-ring);
+}
+
+.pf-v5-c-button.pf-m-link,
+.pf-v5-c-login a {
+  color: var(--r-accent-text);
+  font-weight: 500;
+}
+
+/* Social sign-in */
+#kc-social-providers h2,
+#kc-social-providers hr,
+.pf-v5-c-login__main-footer-band-item {
+  color: var(--r-muted);
+  font-size: 13px;
+}
+
+#kc-social-providers .pf-v5-c-button {
+  justify-content: center !important;
+  gap: 10px;
+}
+
+/* ---------- alerts ---------- */
+
+.pf-v5-c-alert {
+  border-radius: 8px;
+  border: 0;
+  box-shadow: none;
+  font-size: 13.5px;
+}
+
+.pf-v5-c-alert.pf-m-danger,
+.pf-v5-c-alert.pf-m-error {
+  background: var(--r-danger-subtle);
+}
+
+.pf-v5-c-alert.pf-m-success {
+  background: var(--r-success-subtle);
+}
+
+.pf-v5-c-alert.pf-m-info,
+.pf-v5-c-alert.pf-m-warning {
+  background: var(--r-accent-subtle);
+}
+
+.pf-v5-c-alert::before {
+  display: none;
+}
+
+/* Two-factor setup and other lists */
+#kc-totp-secret-qr-code {
+  border: 1px solid var(--r-border);
+  border-radius: 10px;
+  padding: 8px;
+  background: #fff;
+}
+
+.pf-v5-c-login__main ol,
+.pf-v5-c-login__main ul {
+  color: var(--r-muted);
+  font-size: 14px;
+}
+
+@media (max-width: 520px) {
+  .pf-v5-c-login {
+    padding: 24px 12px;
+  }
+
+  .pf-v5-c-login__main-header,
+  .pf-v5-c-login__main-body,
+  .pf-v5-c-login__main-footer {
+    padding-left: 20px !important;
+    padding-right: 20px !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* ---------- refinements ---------- */
+
+.pf-v5-c-login__header {
+  justify-self: center;
+  display: flex;
+  justify-content: center;
+}
+
+#kc-header-wrapper,
+.pf-v5-c-brand {
+  color: var(--r-text) !important;
+}
+
+/* One 1px border that turns accent on focus; no PatternFly underline. */
+.pf-v5-c-form-control::after {
+  display: none !important;
+}
+
+.pf-v5-c-form-control::before,
+.pf-v5-c-form-control:focus-within::before,
+.pf-v5-c-form-control:hover::before {
+  border-width: 1px !important;
+  border-style: solid !important;
+}
+
+.pf-v5-c-form-control:focus-within::before {
+  border-color: var(--r-accent) !important;
+}
+
+.pf-v5-c-form-control.pf-m-error::before {
+  border-color: var(--r-danger) !important;
+}
+
+/* Password field: input and the show/hide button read as one control. */
+.pf-v5-c-input-group {
+  border-radius: 8px;
+}
+
+.pf-v5-c-input-group > .pf-v5-c-input-group__item:first-child .pf-v5-c-form-control,
+.pf-v5-c-input-group > .pf-v5-c-input-group__item:first-child .pf-v5-c-form-control::before {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.pf-v5-c-input-group .pf-v5-c-button.pf-m-control {
+  min-height: 40px;
+  border-radius: 0 8px 8px 0;
+  color: var(--r-muted);
+  background: var(--r-surface);
+}
+
+.pf-v5-c-input-group .pf-v5-c-button.pf-m-control::after {
+  border: 1px solid var(--r-border) !important;
+  border-left: 0 !important;
+  border-radius: 0 8px 8px 0;
+}
+
+.pf-v5-c-input-group .pf-v5-c-button.pf-m-control:hover {
+  color: var(--r-text);
+}
+
+/* Social providers: full-width, neutral, same as secondary buttons. */
+#kc-social-providers ul,
+.pf-v5-c-login__main-body #kc-social-providers ul {
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  gap: 8px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  list-style: none;
+}
+
+#kc-social-providers li {
+  width: 100%;
+  padding: 0 !important;
+}
+
+#kc-social-providers a.pf-v5-c-button {
+  width: 100%;
+  color: var(--r-text) !important;
+  background: var(--r-surface);
+  font-weight: 500;
+}
+
+#kc-social-providers a.pf-v5-c-button::after {
+  border: 1px solid var(--r-border) !important;
+  border-radius: 8px;
+}
+
+#kc-social-providers a.pf-v5-c-button:hover {
+  background: var(--r-sunken);
+}
+
+#kc-social-providers a.pf-v5-c-button:hover::after {
+  border-color: var(--r-border-strong) !important;
+}
+
+#kc-social-providers .kc-social-provider-name,
+#kc-social-providers span {
+  margin: 0 !important;
+}
+
+.pf-v5-c-login__main-footer-band-item,
+#kc-registration {
+  text-align: center;
+}
+
+/* PatternFly also sets these per component (and again under .pf-v5-theme-dark), so set them
+   at the same level for both themes. */
+.pf-v5-c-form-control,
+.pf-v5-theme-dark .pf-v5-c-form-control {
+  --pf-v5-c-form-control--BackgroundColor: var(--r-surface);
+  --pf-v5-c-form-control--Color: var(--r-text);
+  --pf-v5-c-form-control--before--BorderTopColor: var(--r-border);
+  --pf-v5-c-form-control--before--BorderRightColor: var(--r-border);
+  --pf-v5-c-form-control--before--BorderBottomColor: var(--r-border);
+  --pf-v5-c-form-control--before--BorderLeftColor: var(--r-border);
+  background: var(--r-surface);
+}
+
+.pf-v5-c-button,
+.pf-v5-theme-dark .pf-v5-c-button {
+  --pf-v5-c-button--m-primary--BackgroundColor: var(--r-accent);
+  --pf-v5-c-button--m-primary--hover--BackgroundColor: var(--r-accent-hover);
+  --pf-v5-c-button--m-primary--focus--BackgroundColor: var(--r-accent-hover);
+  --pf-v5-c-button--m-primary--active--BackgroundColor: var(--r-accent-hover);
+  --pf-v5-c-button--m-primary--Color: #fff;
+  --pf-v5-c-button--m-primary--hover--Color: #fff;
+  --pf-v5-c-button--m-secondary--BackgroundColor: var(--r-surface);
+  --pf-v5-c-button--m-secondary--Color: var(--r-text);
+  --pf-v5-c-button--m-secondary--hover--Color: var(--r-text);
+  --pf-v5-c-button--m-link--Color: var(--r-accent-text);
+}
+
+.pf-v5-c-login__main,
+.pf-v5-theme-dark .pf-v5-c-login__main {
+  --pf-v5-c-login__main--BackgroundColor: var(--r-surface);
+  background: var(--r-surface);
+}
+
+.pf-v5-c-form-control input:focus,
+.pf-v5-c-form-control select:focus,
+.pf-v5-c-form-control textarea:focus {
+  outline: none !important;
+}
+
+#kc-social-providers {
+  margin-inline: 0 !important;
+  padding-inline: 0 !important;
+}
+
+#kc-social-providers hr {
+  margin-inline: 0;
+  border-color: var(--r-border);
+}
+
+.pf-v5-c-login__main-footer-band {
+  margin-inline: 0 !important;
+}
+
+.pf-v5-c-login__main-footer .pf-v5-c-login__main-body,
+#kc-social-providers.pf-v5-c-login__main-body {
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}
+
+.pf-v5-c-button.pf-m-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pf-v5-c-button.pf-m-secondary::after {
+  border: 1px solid var(--r-border) !important;
+  border-radius: 8px;
+}
+
+.pf-v5-c-button.pf-m-secondary:hover::after {
+  border-color: var(--r-border-strong) !important;
+}
+
+.pf-v5-c-login__main-footer,
+.pf-v5-c-login__main-footer .pf-v5-c-login__main-footer-band {
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}
