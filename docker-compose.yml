@@ -13,6 +13,7 @@ x-riven-env: &riven-env
   RIVEN_OIDC_JWKS_URL_OVERRIDE: http://keycloak:8080/realms/riven/protocol/openid-connect/certs
   RIVEN_SMTP_HOST: mailpit
   RIVEN_SMTP_PORT: "1025"
+  RIVEN_KEYCLOAK_ADMIN_URL: http://keycloak:8080
 
 x-riven-app: &riven-app
   build: .

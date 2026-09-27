@@ -184,7 +184,7 @@ async def _member(session: AsyncSession, org_id: str, user_id: UUID) -> Membersh
 
 
 async def set_role(
-    session: AsyncSession, org_id: str, user_id: UUID, role: Role, actor_role: Role
+    session: AsyncSession, org_id: str, user_id: UUID, role: Role, actor_role: Role | None
 ) -> Membership:
     """Change a member's role. Only owners touch owners; the last owner stays an owner."""
     target = await _member(session, org_id, user_id)
@@ -200,7 +200,7 @@ async def set_role(
 
 
 async def remove_member(
-    session: AsyncSession, org_id: str, user_id: UUID, actor_role: Role
+    session: AsyncSession, org_id: str, user_id: UUID, actor_role: Role | None
 ) -> None:
     target = await _member(session, org_id, user_id)
     if Role(target.role) is Role.OWNER:

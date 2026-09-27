@@ -3,11 +3,20 @@ Alembic autogenerate and the migration drift test see them."""
 
 from riven_db.models.capture import Change, Repository
 from riven_db.models.graph import GraphEdge, GraphNode
-from riven_db.models.identity import Invitation, Membership, Organization, User
+from riven_db.models.identity import (
+    ApiKey,
+    Invitation,
+    Membership,
+    Organization,
+    RevokedSession,
+    ServiceAccount,
+    User,
+)
 from riven_db.models.memory import Bug, RegressionLock
 from riven_db.models.runs import Artifact, VerificationRun
 
 __all__ = [
+    "ApiKey",
     "Artifact",
     "Bug",
     "Change",
@@ -18,6 +27,8 @@ __all__ = [
     "Organization",
     "RegressionLock",
     "Repository",
+    "RevokedSession",
+    "ServiceAccount",
     "User",
     "VerificationRun",
 ]

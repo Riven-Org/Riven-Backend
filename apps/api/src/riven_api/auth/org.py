@@ -15,15 +15,18 @@ from riven_api.auth.deps import CurrentPrincipal, Principal
 from riven_api.auth.permissions import MATRIX, Permission
 from riven_api.db import get_session, get_sessionmaker
 from riven_api.services import orgs
+from riven_api.services.idp_admin import IdpAdmin, get_idp_admin
 from riven_db.models import Organization
 from riven_db.rls import tenant_session
 from riven_schemas import Role
+
+_KNOWN = {p.value for p in Permission}
 
 
 @dataclass(frozen=True)
 class OrgContext:
     org: Organization
-    role: Role
+    role: Role | None  # None for service accounts, which act through key scopes
     principal: Principal
 
     @property
@@ -32,6 +35,8 @@ class OrgContext:
 
     @property
     def permissions(self) -> frozenset[Permission]:
+        if self.role is None:
+            return frozenset(Permission(s) for s in self.principal.scopes if s in _KNOWN)
         return MATRIX[self.role]
 
     def can(self, permission: Permission) -> bool:
@@ -46,10 +51,20 @@ async def org_context(
     org_id: Annotated[str, Path(max_length=64)],
     principal: CurrentPrincipal,
     session: Annotated[AsyncSession, Depends(get_session)],
+    idp: Annotated[IdpAdmin, Depends(get_idp_admin)],
 ) -> OrgContext:
+    if principal.kind == "service_account":
+        org = await session.get(Organization, org_id) if principal.org_id == org_id else None
+        if org is None:
+            raise org_not_found()
+        return OrgContext(org=org, role=None, principal=principal)
     found = await orgs.membership(session, org_id, principal.id)
     if found is None:
         raise org_not_found()
+    if found.org.require_mfa and not await idp.has_mfa(principal.subject):
+        # Make Keycloak ask for TOTP setup at the next sign-in, and tell the dashboard.
+        await idp.require_mfa_enrolment(principal.subject)
+        raise HTTPException(status.HTTP_403_FORBIDDEN, detail="mfa_required")
     return OrgContext(org=found.org, role=found.role, principal=principal)
 
 

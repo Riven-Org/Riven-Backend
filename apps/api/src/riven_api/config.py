@@ -1,7 +1,7 @@
 from functools import lru_cache
 from typing import Self
 
-from pydantic import model_validator
+from pydantic import SecretStr, model_validator
 
 from riven_config import DatabaseSettings, RedisSettings, TemporalSettings
 
@@ -15,6 +15,10 @@ class Settings(DatabaseSettings, RedisSettings, TemporalSettings):
     oidc_issuer: str = "http://localhost:8081/realms/riven"
     oidc_audience: str = "riven-api"
     oidc_jwks_url_override: str | None = None
+    # Keycloak admin API (MFA status, sessions) via the confidential `riven-api` client.
+    keycloak_admin_url: str | None = None  # defaults to the issuer's host
+    keycloak_admin_client_id: str = "riven-api"
+    keycloak_admin_client_secret: SecretStr = SecretStr("riven-dev-secret")
     # Links in emails point at the dashboard; mail goes out over SMTP (Mailpit in dev).
     web_url: str = "http://localhost:5173"
     smtp_host: str = "localhost"

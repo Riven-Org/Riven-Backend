@@ -10,14 +10,15 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from riven_api.auth.access import PermissionedRoute, Requires
-from riven_api.auth.deps import CurrentPrincipal
+from riven_api.auth.deps import CurrentUser
 from riven_api.auth.org import OrgContext, TenantSession
 from riven_api.auth.permissions import MATRIX, Permission
 from riven_api.config import get_settings
 from riven_api.db import get_session
 from riven_api.services import orgs
+from riven_api.services.idp_admin import IdpAdmin, get_idp_admin
 from riven_api.services.mail import Mailer, get_mailer
-from riven_db.models import Repository, User
+from riven_db.models import Organization, Repository, User
 from riven_schemas import Role
 
 router = APIRouter(prefix="/v1", tags=["organizations"], route_class=PermissionedRoute)
@@ -33,20 +34,25 @@ class OrgOut(BaseModel):
     id: str
     name: str
     slug: str
-    role: Role
+    role: Role | None = Field(description="The caller's role; null for service accounts")
     require_mfa: bool
     permissions: list[Permission] = Field(description="What the caller may do in this org")
 
     @classmethod
     def of(cls, found: orgs.OrgWithRole) -> "OrgOut":
-        o = found.org
+        return cls.build(found.org, found.role, MATRIX[found.role])
+
+    @classmethod
+    def build(
+        cls, org: Organization, role: Role | None, permissions: frozenset[Permission]
+    ) -> "OrgOut":
         return cls(
-            id=o.id,
-            name=o.name,
-            slug=o.slug,
-            role=found.role,
-            require_mfa=o.require_mfa,
-            permissions=sorted(MATRIX[found.role]),
+            id=org.id,
+            name=org.name,
+            slug=org.slug,
+            role=role,
+            require_mfa=org.require_mfa,
+            permissions=sorted(permissions),
         )
 
 
@@ -56,6 +62,10 @@ class OrgUpdate(BaseModel):
 
 class RoleIn(BaseModel):
     role: Role
+
+
+class SecurityPolicyIn(BaseModel):
+    require_mfa: bool
 
 
 class MemberOut(BaseModel):
@@ -99,7 +109,7 @@ def _raise(exc: Exception) -> HTTPException:
 
 
 @router.post("/orgs", status_code=status.HTTP_201_CREATED)
-async def create_org(body: OrgIn, principal: CurrentPrincipal, session: Session) -> OrgOut:
+async def create_org(body: OrgIn, principal: CurrentUser, session: Session) -> OrgOut:
     """Create an organization; the caller becomes its owner."""
     created = await orgs.create_org(session, body.name, principal.id)
     await session.commit()
@@ -107,14 +117,14 @@ async def create_org(body: OrgIn, principal: CurrentPrincipal, session: Session)
 
 
 @router.get("/orgs")
-async def list_orgs(principal: CurrentPrincipal, session: Session) -> list[OrgOut]:
+async def list_orgs(principal: CurrentUser, session: Session) -> list[OrgOut]:
     """Organizations the caller belongs to."""
     return [OrgOut.of(found) for found in await orgs.orgs_of(session, principal.id)]
 
 
 @router.get("/orgs/{org_id}")
 async def get_org(ctx: Annotated[OrgContext, Requires(P.ORG_READ)]) -> OrgOut:
-    return OrgOut.of(orgs.OrgWithRole(ctx.org, ctx.role))
+    return OrgOut.build(ctx.org, ctx.role, ctx.permissions)
 
 
 @router.patch("/orgs/{org_id}")
@@ -123,7 +133,25 @@ async def rename_org(
 ) -> OrgOut:
     org = await orgs.rename(session, ctx.org_id, body.name)
     await session.commit()
-    return OrgOut.of(orgs.OrgWithRole(org, ctx.role))
+    return OrgOut.build(org, ctx.role, ctx.permissions)
+
+
+@router.patch("/orgs/{org_id}/security")
+async def update_security_policy(
+    body: SecurityPolicyIn,
+    ctx: Annotated[OrgContext, Requires(P.ORG_SECURITY)],
+    session: Session,
+    idp: Annotated[IdpAdmin, Depends(get_idp_admin)],
+) -> OrgOut:
+    """Require every member to use two-factor authentication. Members without it are asked
+    to enrol at their next sign-in and get `mfa_required` until they do."""
+    if body.require_mfa and not await idp.has_mfa(ctx.principal.subject):
+        raise HTTPException(status.HTTP_409_CONFLICT, detail="enable_mfa_first")
+    org = await session.get(Organization, ctx.org_id)
+    assert org is not None
+    org.require_mfa = body.require_mfa
+    await session.commit()
+    return OrgOut.build(org, ctx.role, ctx.permissions)
 
 
 @router.get("/orgs/{org_id}/members")
@@ -230,9 +258,7 @@ async def revoke_invitation(
 
 
 @router.post("/invitations/accept")
-async def accept_invitation(
-    body: AcceptIn, principal: CurrentPrincipal, session: Session
-) -> OrgOut:
+async def accept_invitation(body: AcceptIn, principal: CurrentUser, session: Session) -> OrgOut:
     """Join the org of an invitation sent to the caller's email."""
     user = await session.get(User, principal.id)
     assert user is not None
