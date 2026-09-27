@@ -7,9 +7,11 @@ acknowledged only after the transaction commits, so a crash means redelivery (at
 and never a second side effect.
 """
 
+import asyncio
+import contextlib
 import logging
 from collections.abc import Awaitable, Callable, Mapping
-from typing import cast
+from typing import Any, cast
 from uuid import UUID
 
 from redis.asyncio import Redis
@@ -19,11 +21,10 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from riven_events.models import ProcessedEvent
 from riven_events.relay import STREAM
-from riven_schemas import DomainEvent
 from riven_schemas.contracts import parse_event
 
 Message = tuple[str, dict[str, str]]
-Handler = Callable[[AsyncSession, DomainEvent], Awaitable[None]]
+Handler = Callable[[AsyncSession, Any], Awaitable[None]]
 log = logging.getLogger(__name__)
 
 
@@ -82,7 +83,16 @@ class EventConsumer:
     async def _handle(self, message_id: str, fields: dict[str, str]) -> None:
         handler = self._handlers.get(fields["type"])
         if handler is not None:
-            event = parse_event(fields["payload"])
+            try:
+                event = parse_event(fields["payload"])
+            except Exception:
+                log.exception(
+                    "%s: failed to parse payload for event %s of type %s",
+                    self.name,
+                    fields.get("event_id"),
+                    fields.get("type"),
+                )
+                raise
             async with self._sessions() as session, session.begin():
                 claimed = await session.execute(
                     insert(ProcessedEvent)
@@ -95,3 +105,24 @@ class EventConsumer:
                 else:
                     await handler(session, event)
         await self._redis.xack(self._stream, self.name, message_id)
+
+    async def run(
+        self,
+        *,
+        poll_seconds: float = 0.5,
+        stop: asyncio.Event | None = None,
+        count: int = 50,
+    ) -> None:
+        """Continuously process stream messages until `stop` is set."""
+        stop = stop or asyncio.Event()
+        await self.ensure_group()
+        block_ms = max(1, int(poll_seconds * 1000))
+        while not stop.is_set():
+            try:
+                processed = await self.process_once(count=count, block_ms=block_ms)
+            except Exception:
+                log.exception("%s consumer batch failed; retrying", self.name)
+                processed = 0
+            if processed == 0:
+                with contextlib.suppress(TimeoutError):
+                    await asyncio.wait_for(stop.wait(), timeout=poll_seconds)

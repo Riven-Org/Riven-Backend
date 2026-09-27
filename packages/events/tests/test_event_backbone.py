@@ -12,7 +12,18 @@ from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from riven_events import STREAM, EventConsumer, OutboxEvent, OutboxRelay, add_event
-from riven_schemas import BugConfirmed, ChangeRef, DomainEvent
+from riven_schemas import (
+    BugConfirmed,
+    ChangeCaptured,
+    ChangeRef,
+    DomainEvent,
+    LockCreated,
+    Producer,
+    ProducerKind,
+    RegressionDetected,
+    VerificationCompleted,
+    VerificationStatus,
+)
 
 CHANGE = ChangeRef(org_id="org_a", repo="acme/shop", commit_sha="abc123")
 
@@ -243,3 +254,116 @@ async def test_events_without_a_handler_are_acknowledged_and_skipped(
 
     assert (await redis.xpending(STREAM, "notifications"))["pending"] == 0
     assert await _count(sessions, "SELECT count(*) FROM processed_events") == 0
+
+
+async def test_multiple_events_staged_in_single_transaction(
+    sessions: async_sessionmaker[AsyncSession], redis: Redis
+) -> None:
+    event1 = _bug_event("bug_tx_1")
+    event2 = _bug_event("bug_tx_2")
+
+    async with sessions() as session, session.begin():
+        await session.execute(text("INSERT INTO demo_bugs VALUES ('tx_1')"))
+        add_event(session, event1, org_id="org_a")
+        add_event(session, event2, org_id="org_a")
+
+    assert await _count(sessions, "SELECT count(*) FROM outbox_events") == 2
+    assert await OutboxRelay(sessions, redis).relay_once() == 2
+    stream_ids = await _stream_event_ids(redis)
+    assert stream_ids == [str(event1.event_id), str(event2.event_id)]
+
+
+async def test_all_domain_events_round_trip_outbox_relay_consumer(
+    sessions: async_sessionmaker[AsyncSession], redis: Redis
+) -> None:
+    events: list[DomainEvent] = [
+        ChangeCaptured(
+            change=CHANGE,
+            producer=Producer(kind=ProducerKind.AI_AGENT, identity="agent-42", agent_model="gpt-5"),
+            files_changed=["src/main.py", "tests/test_main.py"],
+        ),
+        VerificationCompleted(
+            change=CHANGE,
+            run_id="run_42",
+            status=VerificationStatus.PASSED,
+            verifier_identity="pytest-plugin",
+        ),
+        BugConfirmed(
+            change=CHANGE,
+            bug_id="bug_42",
+            fingerprint="fp_42",
+            module="auth",
+        ),
+        RegressionDetected(
+            change=CHANGE,
+            bug_id="bug_42",
+            lock_id="lock_42",
+            fingerprint="fp_42",
+        ),
+        LockCreated(
+            bug_id="bug_42",
+            lock_id="lock_42",
+            test_ref="tests/test_bug_42.py",
+            fixed_by=CHANGE,
+        ),
+    ]
+
+    async with sessions() as session, session.begin():
+        for ev in events:
+            add_event(session, ev, org_id=CHANGE.org_id)
+
+    assert await _count(sessions, "SELECT count(*) FROM outbox_events") == len(events)
+    assert await OutboxRelay(sessions, redis).relay_once() == len(events)
+
+    received: list[DomainEvent] = []
+
+    async def handle_any(_sess: AsyncSession, ev: DomainEvent) -> None:
+        received.append(ev)
+
+    consumer = EventConsumer(
+        "catalog_verifier",
+        sessions,
+        redis,
+        {
+            "change.captured": handle_any,
+            "verification.completed": handle_any,
+            "bug.confirmed": handle_any,
+            "regression.detected": handle_any,
+            "lock.created": handle_any,
+        },
+    )
+
+    processed_count = await consumer.process_once()
+    assert processed_count == len(events)
+    assert len(received) == len(events)
+    assert [type(e) for e in received] == [type(e) for e in events]
+    assert [e.event_id for e in received] == [e.event_id for e in events]
+    assert await _count(sessions, "SELECT count(*) FROM processed_events") == len(events)
+
+
+async def test_consumer_run_loop_processes_and_stops_cleanly(
+    sessions: async_sessionmaker[AsyncSession], redis: Redis
+) -> None:
+    event = _bug_event("run_loop_bug")
+    await _confirm_bug(sessions, event)
+    await OutboxRelay(sessions, redis).relay_once()
+
+    received: list[DomainEvent] = []
+
+    async def on_bug(_sess: AsyncSession, ev: DomainEvent) -> None:
+        received.append(ev)
+
+    stop = asyncio.Event()
+    consumer = EventConsumer("loop_consumer", sessions, redis, {"bug.confirmed": on_bug})
+    consumer_task = asyncio.create_task(consumer.run(poll_seconds=0.05, stop=stop))
+
+    committed = time.monotonic()
+    while not received:
+        assert time.monotonic() - committed < 2.0, "consumer did not process within 2s"
+        await asyncio.sleep(0.02)
+
+    stop.set()
+    await consumer_task
+    assert len(received) == 1
+    assert received[0].event_id == event.event_id
+    assert await _count(sessions, "SELECT count(*) FROM processed_events") == 1

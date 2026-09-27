@@ -82,7 +82,11 @@ async def main() -> None:
     redis = Redis.from_url(settings.redis_url.get_secret_value(), decode_responses=True)
     relay = OutboxRelay(async_sessionmaker(engine, expire_on_commit=False), redis)
     log.info("outbox relay publishing to %s", STREAM)
-    await relay.run(poll_seconds=settings.outbox_poll_seconds)
+    try:
+        await relay.run(poll_seconds=settings.outbox_poll_seconds)
+    finally:
+        await redis.aclose()
+        await engine.dispose()
 
 
 if __name__ == "__main__":
