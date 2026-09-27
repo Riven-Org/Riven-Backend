@@ -81,3 +81,21 @@ exists. The identity service always filters them explicitly.
   credentials (person → `human`/email; service account → `ai_agent` or `bot`/`sa:<name>` and
   model). The body cannot name a producer (unknown fields are rejected), and the change's
   `change.captured` event is written to the outbox in the same transaction.
+
+## MFA and sessions (S03.5)
+
+- **TOTP** (and WebAuthn security keys) come from Keycloak: the realm's OTP policy is TOTP,
+  6 digits, 30 s; the default browser flow's conditional second factor asks for it whenever
+  a user has one enrolled; **recovery codes** are a Keycloak required action the dashboard
+  can start (`kc_action=CONFIGURE_RECOVERY_AUTHN_CODES`).
+- **Org-enforced MFA:** `PATCH /v1/orgs/{org}/security {require_mfa}` (permission
+  `org.security`) — refused with `enable_mfa_first` unless the caller has a second factor, so
+  admins can't lock themselves out. When the policy is on, a member without a second factor
+  gets `403 mfa_required` on that org's endpoints, and the API sets Keycloak's
+  `CONFIGURE_TOTP` required action so the next sign-in forces enrolment. Enrolment status is
+  read from the Keycloak admin API (`riven-api` service account); positive results are
+  cached for 60 s.
+- **Sessions:** `/v1/me/sessions` lists the caller's Keycloak sessions (current one marked);
+  revoking one (or "all others") ends it in Keycloak **and** records its `sid` in
+  `revoked_sessions`, which the JWT check consults, so tokens of that session get 401 on the
+  next call instead of living until they expire.

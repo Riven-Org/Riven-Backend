@@ -14,9 +14,10 @@ from riven_api.auth.jwks import JwksCache
 from riven_api.auth.tokens import TokenVerifier
 from riven_api.db import get_sessionmaker
 from riven_api.main import create_app
+from riven_api.services.idp_admin import get_idp_admin
 from riven_api.services.mail import get_mailer
 
-from api_fakes import AUDIENCE, ISSUER, FakeIdP, FakeMailer  # isort: skip
+from api_fakes import AUDIENCE, ISSUER, FakeIdP, FakeIdpAdmin, FakeMailer  # isort: skip
 
 
 @pytest.fixture
@@ -35,10 +36,19 @@ def mailer() -> FakeMailer:
 
 
 @pytest.fixture
+def idp_admin() -> FakeIdpAdmin:
+    return FakeIdpAdmin()
+
+
+@pytest.fixture
 def app(
-    verifier: TokenVerifier, sessions: async_sessionmaker[AsyncSession], mailer: FakeMailer
+    verifier: TokenVerifier,
+    sessions: async_sessionmaker[AsyncSession],
+    mailer: FakeMailer,
+    idp_admin: FakeIdpAdmin,
 ) -> FastAPI:
     application = create_app()
+    application.dependency_overrides[get_idp_admin] = lambda: idp_admin
     application.dependency_overrides[get_mailer] = lambda: mailer
     application.dependency_overrides[get_token_verifier] = lambda: verifier
     application.dependency_overrides[get_sessionmaker] = lambda: sessions

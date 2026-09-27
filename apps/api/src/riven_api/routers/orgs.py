@@ -16,6 +16,7 @@ from riven_api.auth.permissions import MATRIX, Permission
 from riven_api.config import get_settings
 from riven_api.db import get_session
 from riven_api.services import orgs
+from riven_api.services.idp_admin import IdpAdmin, get_idp_admin
 from riven_api.services.mail import Mailer, get_mailer
 from riven_db.models import Organization, Repository, User
 from riven_schemas import Role
@@ -61,6 +62,10 @@ class OrgUpdate(BaseModel):
 
 class RoleIn(BaseModel):
     role: Role
+
+
+class SecurityPolicyIn(BaseModel):
+    require_mfa: bool
 
 
 class MemberOut(BaseModel):
@@ -127,6 +132,24 @@ async def rename_org(
     body: OrgUpdate, ctx: Annotated[OrgContext, Requires(P.ORG_UPDATE)], session: Session
 ) -> OrgOut:
     org = await orgs.rename(session, ctx.org_id, body.name)
+    await session.commit()
+    return OrgOut.build(org, ctx.role, ctx.permissions)
+
+
+@router.patch("/orgs/{org_id}/security")
+async def update_security_policy(
+    body: SecurityPolicyIn,
+    ctx: Annotated[OrgContext, Requires(P.ORG_SECURITY)],
+    session: Session,
+    idp: Annotated[IdpAdmin, Depends(get_idp_admin)],
+) -> OrgOut:
+    """Require every member to use two-factor authentication. Members without it are asked
+    to enrol at their next sign-in and get `mfa_required` until they do."""
+    if body.require_mfa and not await idp.has_mfa(ctx.principal.subject):
+        raise HTTPException(status.HTTP_409_CONFLICT, detail="enable_mfa_first")
+    org = await session.get(Organization, ctx.org_id)
+    assert org is not None
+    org.require_mfa = body.require_mfa
     await session.commit()
     return OrgOut.build(org, ctx.role, ctx.permissions)
 
