@@ -9,6 +9,7 @@ from datetime import datetime
 from uuid import UUID
 
 from sqlalchemy import DateTime, ForeignKey, String, func
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from riven_db.base import Base, uuid_pk
@@ -67,4 +68,39 @@ class Invitation(Base):
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     accepted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     accepted_by: Mapped[UUID | None] = mapped_column(ForeignKey("users.id"))
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class ServiceAccount(Base):
+    """A non-human identity (AI agent, CI system, bot) that acts in one org (S03.4)."""
+
+    __tablename__ = "service_accounts"
+    __table_args__ = {"info": GLOBAL}
+
+    id: Mapped[UUID] = uuid_pk()
+    org_id: Mapped[str] = mapped_column(ForeignKey("organizations.id"), index=True)
+    name: Mapped[str] = mapped_column(String(100))
+    kind: Mapped[str] = mapped_column(String(16))
+    agent_model: Mapped[str | None] = mapped_column(String(128))
+    created_by: Mapped[UUID] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    disabled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class ApiKey(Base):
+    """A scoped, expiring secret for a service account. Only an Argon2 hash is stored."""
+
+    __tablename__ = "api_keys"
+    __table_args__ = {"info": GLOBAL}
+
+    id: Mapped[UUID] = uuid_pk()
+    org_id: Mapped[str] = mapped_column(ForeignKey("organizations.id"), index=True)
+    service_account_id: Mapped[UUID] = mapped_column(ForeignKey("service_accounts.id"), index=True)
+    prefix: Mapped[str] = mapped_column(String(16), unique=True)
+    secret_hash: Mapped[str] = mapped_column(String(255))
+    scopes: Mapped[list[str]] = mapped_column(JSONB)
+    created_by: Mapped[UUID] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

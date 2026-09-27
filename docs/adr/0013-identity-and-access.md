@@ -63,3 +63,21 @@ exists. The identity service always filters them explicitly.
 - Only owners manage owners, and an org always keeps one owner.
 - Org responses include the caller's `permissions`, so the dashboard hides actions without
   re-implementing the rules; the API stays the authority.
+
+## Service accounts and API keys (S03.4)
+
+- A **service account** is a non-human identity bound to one org, of kind `ai_agent`, `ci` or
+  `bot` (with an optional agent model). It authenticates with **API keys**
+  `rvn_<prefix>_<secret>`: the prefix is stored for lookup, the secret only as an **Argon2**
+  hash, and the full key is returned once, at creation or rotation.
+- Every key has **scopes** (permissions from the matrix, defaulting per kind) that must be a
+  subset of what its creator holds, an optional expiry (90 days by default) and
+  `last_used_at`. Rotation issues a new secret with the same scopes and lifetime and revokes
+  the old one; disabling an account revokes all its keys.
+- Revocation, expiry and disabled accounts are checked on **every** request, so a revoked key
+  fails on its next use. Successful Argon2 checks are cached in memory for 60 s to keep
+  hashing off the hot path; the cache never bypasses the revocation checks.
+- **Producer identity:** `POST /v1/orgs/{org}/changes` records the producer from the
+  credentials (person → `human`/email; service account → `ai_agent` or `bot`/`sa:<name>` and
+  model). The body cannot name a producer (unknown fields are rejected), and the change's
+  `change.captured` event is written to the outbox in the same transaction.

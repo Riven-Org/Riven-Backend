@@ -19,11 +19,13 @@ from riven_db.models import Organization
 from riven_db.rls import tenant_session
 from riven_schemas import Role
 
+_KNOWN = {p.value for p in Permission}
+
 
 @dataclass(frozen=True)
 class OrgContext:
     org: Organization
-    role: Role
+    role: Role | None  # None for service accounts, which act through key scopes
     principal: Principal
 
     @property
@@ -32,6 +34,8 @@ class OrgContext:
 
     @property
     def permissions(self) -> frozenset[Permission]:
+        if self.role is None:
+            return frozenset(Permission(s) for s in self.principal.scopes if s in _KNOWN)
         return MATRIX[self.role]
 
     def can(self, permission: Permission) -> bool:
@@ -47,6 +51,11 @@ async def org_context(
     principal: CurrentPrincipal,
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> OrgContext:
+    if principal.kind == "service_account":
+        org = await session.get(Organization, org_id) if principal.org_id == org_id else None
+        if org is None:
+            raise org_not_found()
+        return OrgContext(org=org, role=None, principal=principal)
     found = await orgs.membership(session, org_id, principal.id)
     if found is None:
         raise org_not_found()

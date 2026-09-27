@@ -38,12 +38,29 @@ async def _victim_resources(
         json={"email": "someone@globex.dev"},
         headers=auth(**BOB),
     )
-    async with sessions() as session, session.begin():
-        repo = Repository(org_id=victim_org, full_name="globex/secret")
-        session.add(repo)
-        await session.flush()
-        repo_id = str(repo.id)
-    return {"invitation_id": invited.json()["id"], "repository_id": repo_id}
+    account = await client.post(
+        f"/v1/orgs/{victim_org}/service-accounts",
+        json={"name": "victim-bot", "kind": "bot"},
+        headers=auth(**BOB),
+    )
+    key = await client.post(
+        f"/v1/orgs/{victim_org}/service-accounts/{account.json()['id']}/keys",
+        json={},
+        headers=auth(**BOB),
+    )
+    change = await client.post(
+        f"/v1/orgs/{victim_org}/changes",
+        json={"repository": "globex/secret", "commit_sha": "abcdef1"},
+        headers=auth(**BOB),
+    )
+    members = await client.get(f"/v1/orgs/{victim_org}/members", headers=auth(**BOB))
+    return {
+        "invitation_id": invited.json()["id"],
+        "account_id": account.json()["id"],
+        "key_id": key.json()["id"],
+        "change_id": change.json()["id"],
+        "user_id": members.json()[0]["user_id"],
+    }
 
 
 async def test_every_org_endpoint_denies_members_of_other_orgs(
@@ -73,6 +90,10 @@ async def test_every_org_endpoint_denies_members_of_other_orgs(
     assert [i["id"] for i in pending.json()] == [ids["invitation_id"]]
     repos = await client.get(f"/v1/orgs/{victim}/repositories", headers=auth(**BOB))
     assert [r["full_name"] for r in repos.json()] == ["globex/secret"]
+    keys = await client.get(f"/v1/orgs/{victim}/service-accounts", headers=auth(**BOB))
+    assert [k["id"] for k in keys.json()[0]["keys"]] == [ids["key_id"]]
+    owners = await client.get(f"/v1/orgs/{victim}/members", headers=auth(**BOB))
+    assert [m["role"] for m in owners.json()] == ["owner"]
 
 
 async def test_unknown_org_looks_the_same_as_a_foreign_org(client: AsyncClient, auth: Auth) -> None:
