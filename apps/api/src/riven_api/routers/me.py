@@ -1,9 +1,10 @@
 from fastapi import APIRouter
 from pydantic import BaseModel
 
+from riven_api.auth.access import PermissionedRoute
 from riven_api.auth.deps import CurrentPrincipal
 
-router = APIRouter(prefix="/v1", tags=["identity"])
+router = APIRouter(prefix="/v1", tags=["identity"], route_class=PermissionedRoute)
 
 
 class MeOut(BaseModel):

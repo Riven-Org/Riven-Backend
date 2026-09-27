@@ -12,6 +12,7 @@ from fastapi import Depends, HTTPException, Path, status
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from riven_api.auth.deps import CurrentPrincipal, Principal
+from riven_api.auth.permissions import MATRIX, Permission
 from riven_api.db import get_session, get_sessionmaker
 from riven_api.services import orgs
 from riven_db.models import Organization
@@ -28,6 +29,13 @@ class OrgContext:
     @property
     def org_id(self) -> str:
         return self.org.id
+
+    @property
+    def permissions(self) -> frozenset[Permission]:
+        return MATRIX[self.role]
+
+    def can(self, permission: Permission) -> bool:
+        return permission in self.permissions
 
 
 def org_not_found() -> HTTPException:
