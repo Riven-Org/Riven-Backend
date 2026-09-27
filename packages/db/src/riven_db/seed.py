@@ -17,11 +17,10 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from riven_config import DatabaseSettings
+from riven_db.graph_repository import GraphRepository
 from riven_db.models import (
     Bug,
     Change,
-    GraphEdge,
-    GraphNode,
     RegressionLock,
     Repository,
     VerificationRun,
@@ -40,6 +39,7 @@ from riven_schemas import (
 DEMO_ORG = "demo"
 DEMO_REPO = "riven-demo/shop"
 VERIFIER = "riven-verifier"
+LOCK_TEST = "tests/test_token_expiry.py::test_token_valid_until_exact_expiry"
 T0 = datetime(2026, 9, 1, 9, 0, tzinfo=UTC)
 
 
@@ -174,49 +174,25 @@ async def seed(session: AsyncSession) -> bool:
         RegressionLock(
             org_id=DEMO_ORG,
             bug_id=bug.id,
-            test_ref="tests/test_token_expiry.py::test_token_valid_until_exact_expiry",
+            test_ref=LOCK_TEST,
             fixed_by_change_id=changes["c3d4e5f"].id,
             status=LockStatus.ACTIVE.value,
         )
     )
 
+    graph = GraphRepository(session, DEMO_ORG)
     nodes = {
-        "req": GraphNode(
-            org_id=DEMO_ORG,
-            kind=NodeKind.REQUIREMENT,
-            key="REQ-12",
-            label="Sessions last exactly 30 minutes",
-        ),
-        "change": GraphNode(
-            org_id=DEMO_ORG, kind=NodeKind.CHANGE, key="b2c3d4e", label="Refactor token expiry"
-        ),
-        "module": GraphNode(
-            org_id=DEMO_ORG, kind=NodeKind.MODULE, key="auth/token.py", label="auth/token.py"
-        ),
-        "bug": GraphNode(
-            org_id=DEMO_ORG,
-            kind=NodeKind.BUG,
-            key=str(bug.id),
-            label="Tokens expire one second early",
-        ),
-        "fix": GraphNode(
-            org_id=DEMO_ORG,
-            kind=NodeKind.FIX,
-            key="c3d4e5f",
-            label="Fix off-by-one in token expiry",
-        ),
-        "test": GraphNode(
-            org_id=DEMO_ORG,
-            kind=NodeKind.TEST,
-            key="tests/test_token_expiry.py::test_token_valid_until_exact_expiry",
-            label="test_token_valid_until_exact_expiry",
-        ),
-        "recurrence": GraphNode(
-            org_id=DEMO_ORG, kind=NodeKind.CHANGE, key="d4e5f6a", label="Speed up token refresh"
-        ),
+        name: await graph.upsert_node(kind, key, label)
+        for name, kind, key, label in (
+            ("req", NodeKind.REQUIREMENT, "REQ-12", "Sessions last exactly 30 minutes"),
+            ("change", NodeKind.CHANGE, "b2c3d4e", "Refactor token expiry"),
+            ("module", NodeKind.MODULE, "auth/token.py", "auth/token.py"),
+            ("bug", NodeKind.BUG, str(bug.id), "Tokens expire one second early"),
+            ("fix", NodeKind.FIX, "c3d4e5f", "Fix off-by-one in token expiry"),
+            ("test", NodeKind.TEST, LOCK_TEST, "test_token_valid_until_exact_expiry"),
+            ("recurrence", NodeKind.CHANGE, "d4e5f6a", "Speed up token refresh"),
+        )
     }
-    session.add_all(nodes.values())
-    await session.flush()
     for source, kind, target in (
         ("change", "implements", "req"),
         ("change", "modifies", "module"),
@@ -226,16 +202,8 @@ async def seed(session: AsyncSession) -> bool:
         ("test", "guards", "bug"),
         ("recurrence", "reintroduced", "bug"),
     ):
-        session.add(
-            GraphEdge(
-                org_id=DEMO_ORG,
-                kind=kind,
-                source_id=nodes[source].id,
-                target_id=nodes[target].id,
-                provenance="seed",
-                confidence=1.0,
-                created_by="riven-seed",
-            )
+        await graph.add_edge(
+            nodes[source], kind, nodes[target], provenance="seed", created_by="riven-seed"
         )
     return True
 

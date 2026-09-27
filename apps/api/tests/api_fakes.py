@@ -6,6 +6,7 @@ from typing import Any
 
 import jwt
 from cryptography.hazmat.primitives.asymmetric import rsa
+from httpx import AsyncClient
 from jwt.algorithms import RSAAlgorithm
 
 ISSUER = "https://idp.test/realms/riven"
@@ -45,3 +46,48 @@ class FakeIdP:
         claims.update(overrides)
         claims = {k: v for k, v in claims.items() if v is not None}
         return jwt.encode(claims, self.private_key, algorithm="RS256", headers={"kid": self.kid})
+
+
+class FakeMailer:
+    """Captures outgoing email instead of sending it."""
+
+    def __init__(self) -> None:
+        self.sent: list[tuple[str, str, str]] = []
+
+    async def send(self, to: str, subject: str, body: str) -> None:
+        self.sent.append((to, subject, body))
+
+    def last_token(self) -> str:
+        body = self.sent[-1][2]
+        return body.split("token=", 1)[1].split()[0]
+
+
+ALICE = {"sub": "user-alice", "email": "alice@acme.dev", "name": "Alice"}
+BOB = {"sub": "user-bob", "email": "bob@globex.dev", "name": "Bob"}
+CAROL = {"sub": "user-carol", "email": "carol@acme.dev", "name": "Carol"}
+
+
+async def make_org(client: AsyncClient, headers: dict[str, str], name: str) -> str:
+    response = await client.post("/v1/orgs", json={"name": name}, headers=headers)
+    assert response.status_code == 201, response.text
+    org_id: str = response.json()["id"]
+    return org_id
+
+
+async def add_member(
+    client: AsyncClient,
+    mailer: FakeMailer,
+    org_id: str,
+    owner: dict[str, str],
+    member: dict[str, str],
+    email: str,
+    role: str,
+) -> None:
+    invited = await client.post(
+        f"/v1/orgs/{org_id}/invitations", json={"email": email, "role": role}, headers=owner
+    )
+    assert invited.status_code == 201, invited.text
+    accepted = await client.post(
+        "/v1/invitations/accept", json={"token": mailer.last_token()}, headers=member
+    )
+    assert accepted.status_code == 200, accepted.text

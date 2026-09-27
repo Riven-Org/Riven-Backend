@@ -12,10 +12,11 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from riven_api.auth.deps import get_token_verifier
 from riven_api.auth.jwks import JwksCache
 from riven_api.auth.tokens import TokenVerifier
-from riven_api.db import get_session
+from riven_api.db import get_sessionmaker
 from riven_api.main import create_app
+from riven_api.services.mail import get_mailer
 
-from api_fakes import AUDIENCE, ISSUER, FakeIdP  # noqa: F401  isort: skip
+from api_fakes import AUDIENCE, ISSUER, FakeIdP, FakeMailer  # isort: skip
 
 
 @pytest.fixture
@@ -29,15 +30,18 @@ def verifier(idp: FakeIdP) -> TokenVerifier:
 
 
 @pytest.fixture
-def app(verifier: TokenVerifier, sessions: async_sessionmaker[AsyncSession]) -> FastAPI:
+def mailer() -> FakeMailer:
+    return FakeMailer()
+
+
+@pytest.fixture
+def app(
+    verifier: TokenVerifier, sessions: async_sessionmaker[AsyncSession], mailer: FakeMailer
+) -> FastAPI:
     application = create_app()
-
-    async def session() -> AsyncIterator[AsyncSession]:
-        async with sessions() as s:
-            yield s
-
+    application.dependency_overrides[get_mailer] = lambda: mailer
     application.dependency_overrides[get_token_verifier] = lambda: verifier
-    application.dependency_overrides[get_session] = session
+    application.dependency_overrides[get_sessionmaker] = lambda: sessions
     return application
 
 

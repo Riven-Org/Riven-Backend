@@ -11,6 +11,8 @@ x-riven-env: &riven-env
   # Browser-facing issuer (must match the token's `iss`); keys fetched over the internal network.
   RIVEN_OIDC_ISSUER: http://localhost:8081/realms/riven
   RIVEN_OIDC_JWKS_URL_OVERRIDE: http://keycloak:8080/realms/riven/protocol/openid-connect/certs
+  RIVEN_SMTP_HOST: mailpit
+  RIVEN_SMTP_PORT: "1025"
 
 x-riven-app: &riven-app
   build: .
