@@ -8,6 +8,7 @@ from riven_db.models.identity import (
     Invitation,
     Membership,
     Organization,
+    RevokedSession,
     ServiceAccount,
     User,
 )
@@ -26,6 +27,7 @@ __all__ = [
     "Organization",
     "RegressionLock",
     "Repository",
+    "RevokedSession",
     "ServiceAccount",
     "User",
     "VerificationRun",

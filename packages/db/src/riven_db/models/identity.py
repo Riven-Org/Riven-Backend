@@ -104,3 +104,16 @@ class ApiKey(Base):
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class RevokedSession(Base):
+    """IdP sessions a user revoked through Riven. Tokens carrying their `sid` are refused
+    immediately instead of living until they expire (S03.5.3)."""
+
+    __tablename__ = "revoked_sessions"
+    __table_args__ = {"info": GLOBAL}
+
+    session_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"))
+    revoked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)

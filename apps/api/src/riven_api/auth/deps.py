@@ -16,7 +16,7 @@ from riven_api.auth.jwks import JwksCache, http_fetcher
 from riven_api.auth.tokens import InvalidToken, TokenVerifier
 from riven_api.config import get_settings
 from riven_api.db import get_session
-from riven_api.services import api_keys, users
+from riven_api.services import api_keys, sessions, users
 from riven_schemas import Producer, ProducerKind
 
 SERVICE_ACCOUNT_PRODUCERS = {
@@ -36,6 +36,7 @@ class Principal:
     name: str
     producer: Producer
     session_id: str | None = None
+    subject: str = ""  # identity-provider user id (Keycloak `sub`)
     org_id: str | None = None
     scopes: frozenset[str] = field(default_factory=frozenset)
 
@@ -97,6 +98,8 @@ async def current_principal(
         raise _unauthorized(f"invalid token: {exc}") from exc
     if not claims.email_verified:
         raise HTTPException(status.HTTP_403_FORBIDDEN, detail="email_not_verified")
+    if claims.session_id and await sessions.is_revoked(session, claims.session_id):
+        raise _unauthorized("session revoked")
     user = await users.get_or_provision(session, claims)
     await session.commit()
     return Principal(
@@ -106,6 +109,7 @@ async def current_principal(
         name=user.name,
         producer=Producer(kind=ProducerKind.HUMAN, identity=user.email),
         session_id=claims.session_id,
+        subject=claims.subject,
     )
 
 

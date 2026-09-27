@@ -48,6 +48,45 @@ class FakeIdP:
         return jwt.encode(claims, self.private_key, algorithm="RS256", headers={"kid": self.kid})
 
 
+class FakeIdpAdmin:
+    """Stands in for the Keycloak admin API."""
+
+    def __init__(self) -> None:
+        self.mfa: set[str] = set()
+        self.forced_enrolment: set[str] = set()
+        self.live: dict[str, list[str]] = {}
+        self.ended: list[str] = []
+
+    async def has_mfa(self, user_id: str) -> bool:
+        return user_id in self.mfa
+
+    async def require_mfa_enrolment(self, user_id: str) -> None:
+        self.forced_enrolment.add(user_id)
+
+    async def sessions(self, user_id: str) -> list[Any]:
+        from datetime import UTC, datetime
+
+        from riven_api.services.idp_admin import IdpSession
+
+        now = datetime.now(UTC)
+        return [
+            IdpSession(
+                id=sid,
+                ip_address="127.0.0.1",
+                started_at=now,
+                last_access_at=now,
+                clients=["riven-web"],
+            )
+            for sid in self.live.get(user_id, [])
+        ]
+
+    async def end_session(self, session_id: str) -> None:
+        self.ended.append(session_id)
+        for sids in self.live.values():
+            if session_id in sids:
+                sids.remove(session_id)
+
+
 class FakeMailer:
     """Captures outgoing email instead of sending it."""
 

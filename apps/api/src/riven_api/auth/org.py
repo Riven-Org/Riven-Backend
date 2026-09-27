@@ -15,6 +15,7 @@ from riven_api.auth.deps import CurrentPrincipal, Principal
 from riven_api.auth.permissions import MATRIX, Permission
 from riven_api.db import get_session, get_sessionmaker
 from riven_api.services import orgs
+from riven_api.services.idp_admin import IdpAdmin, get_idp_admin
 from riven_db.models import Organization
 from riven_db.rls import tenant_session
 from riven_schemas import Role
@@ -50,6 +51,7 @@ async def org_context(
     org_id: Annotated[str, Path(max_length=64)],
     principal: CurrentPrincipal,
     session: Annotated[AsyncSession, Depends(get_session)],
+    idp: Annotated[IdpAdmin, Depends(get_idp_admin)],
 ) -> OrgContext:
     if principal.kind == "service_account":
         org = await session.get(Organization, org_id) if principal.org_id == org_id else None
@@ -59,6 +61,10 @@ async def org_context(
     found = await orgs.membership(session, org_id, principal.id)
     if found is None:
         raise org_not_found()
+    if found.org.require_mfa and not await idp.has_mfa(principal.subject):
+        # Make Keycloak ask for TOTP setup at the next sign-in, and tell the dashboard.
+        await idp.require_mfa_enrolment(principal.subject)
+        raise HTTPException(status.HTTP_403_FORBIDDEN, detail="mfa_required")
     return OrgContext(org=found.org, role=found.role, principal=principal)
 
 
