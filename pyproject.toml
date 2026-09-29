@@ -33,6 +33,7 @@ dev = [
     "pre-commit>=3.8",
     "fakeredis>=2.26",
     "moto[s3]>=5.0",
+    "pytest-cov>=7.1.0",
 ]
 
 [tool.ruff]
@@ -62,3 +63,28 @@ ignore_missing_imports = true
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["apps/api/tests", "apps/worker/tests", "packages/schemas/tests", "packages/events/tests", "packages/db/tests", "packages/storage/tests", "packages/config/tests"]
+
+[tool.coverage.run]
+source = [
+    "apps/api/src",
+    "apps/worker/src",
+    "packages/config/src",
+    "packages/db/src",
+    "packages/events/src",
+    "packages/schemas/src",
+    "packages/storage/src",
+]
+omit = [
+    "*/tests/*",
+    "apps/api/alembic/*",
+]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+]

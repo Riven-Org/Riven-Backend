@@ -5,6 +5,10 @@ on:
   push:
     branches: ["**"]
 
+permissions:
+  contents: read
+  pull-requests: write
+
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
@@ -40,7 +44,28 @@ jobs:
       - run: uv run ruff check .
       - run: uv run ruff format --check .
       - run: uv run mypy apps/api/src apps/worker/src packages/schemas/src packages/events/src packages/db/src packages/storage/src packages/config/src
-      - run: uv run pytest
+      - name: Run tests with coverage
+        run: |
+          uv run pytest --cov --cov-report=term --cov-report=xml:build/coverage.xml
+          mkdir -p build
+          echo "<!-- riven-coverage-report -->" > build/coverage-summary.md
+          echo "### 📊 Test Coverage Report" >> build/coverage-summary.md
+          echo "" >> build/coverage-summary.md
+          uv run python -m coverage report --format=markdown >> build/coverage-summary.md
+          cat build/coverage-summary.md >> $GITHUB_STEP_SUMMARY
+      - name: Post coverage report to PR
+        if: github.event_name == 'pull_request'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PR_NUMBER="${{ github.event.pull_request.number }}"
+          EXISTING_COMMENT=$(gh api "repos/${{ github.repository }}/issues/${PR_NUMBER}/comments" --jq '.[] | select(.body | contains("riven-coverage-report")) | .id' | head -n 1)
+          if [ -n "$EXISTING_COMMENT" ]; then
+            gh api -X PATCH "repos/${{ github.repository }}/issues/comments/${EXISTING_COMMENT}" -F body=@build/coverage-summary.md
+          else
+            gh pr comment "${PR_NUMBER}" --body-file build/coverage-summary.md
+          fi
       - name: Export contracts as JSON Schema
         run: uv run python -m riven_schemas.export build/json-schema
       - uses: actions/upload-artifact@v4

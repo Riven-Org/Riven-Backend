@@ -1,4 +1,4 @@
-.PHONY: install dev seed up down api worker relay migrate test lint fmt typecheck check schemas catalog
+.PHONY: install dev seed up down api worker relay migrate test coverage lint fmt typecheck check schemas catalog
 
 install:        ## Install dependencies and git hooks
 	uv sync
@@ -40,7 +40,10 @@ migrate:        ## Apply database migrations
 	uv run alembic -c apps/api/alembic.ini upgrade head
 
 test:
-	uv run pytest
+	uv run pytest --cov
+
+coverage:        ## Run test suite with detailed coverage report
+	uv run pytest --cov --cov-report=term-missing --cov-report=xml:build/coverage.xml
 
 lint:
 	uv run ruff check .

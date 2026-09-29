@@ -1,0 +1,21 @@
+# Code Owners for Riven-Backend (ticket S02.3.3)
+# These owners are automatically requested for reviews when PRs touch matching paths.
+
+* @Abubakar-Shabbir @ahsananjum
+
+# Shared core packages
+/packages/schemas/ @Abubakar-Shabbir @ahsananjum
+/packages/config/ @Abubakar-Shabbir @ahsananjum
+/packages/db/ @Abubakar-Shabbir @ahsananjum
+/packages/events/ @Abubakar-Shabbir @ahsananjum
+/packages/storage/ @Abubakar-Shabbir @ahsananjum
+
+# Applications
+/apps/api/ @Abubakar-Shabbir @ahsananjum
+/apps/worker/ @Abubakar-Shabbir @ahsananjum
+
+# CI and Infrastructure
+/.github/ @Abubakar-Shabbir @ahsananjum
+/infra/ @Abubakar-Shabbir @ahsananjum
+/docker-compose.yml @Abubakar-Shabbir @ahsananjum
+/Dockerfile @Abubakar-Shabbir @ahsananjum
