@@ -1,0 +1,12 @@
+# Staging Environment Configuration (Ticket S02.4)
+# Copy to terraform.tfvars for deployment. Never commit real credentials.
+
+aws_region        = "us-east-1"
+environment       = "staging"
+postgres_password = "replace-with-secure-vault-secret"
+
+tags = {
+  Project     = "Riven"
+  Environment = "staging"
+  ManagedBy   = "Terraform"
+}

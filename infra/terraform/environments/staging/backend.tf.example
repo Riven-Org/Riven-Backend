@@ -1,0 +1,12 @@
+# Copy to backend.tf after provisioning remote state resources (ticket S02.4.1)
+# Do not commit real AWS account backend files containing sensitive identifiers.
+
+terraform {
+  backend "s3" {
+    bucket         = "riven-tfstate-staging-bucket"
+    key            = "staging/terraform.tfstate"
+    region         = "us-east-1"
+    dynamodb_table = "riven-tfstate-staging-locks"
+    encrypt        = true
+  }
+}
