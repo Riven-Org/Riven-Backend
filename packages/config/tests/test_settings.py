@@ -128,6 +128,7 @@ SERVICES = {
     "api": [sys.executable, "-c", "import riven_api.main"],
     "worker": [sys.executable, "-m", "riven_worker.main"],
     "relay": [sys.executable, "-m", "riven_events.relay"],
+    "storage": [sys.executable, "-m", "riven_storage"],
 }
 
 

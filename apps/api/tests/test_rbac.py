@@ -27,7 +27,7 @@ DOC = Path(__file__).resolve().parents[3] / "docs" / "permissions.md"
 
 
 def test_permission_matrix_doc_is_up_to_date() -> None:
-    assert DOC.read_text() == render(), (
+    assert DOC.read_text(encoding="utf-8") == render(), (
         "docs/permissions.md is stale: "
         "uv run python -m riven_api.auth.permissions > docs/permissions.md"
     )
