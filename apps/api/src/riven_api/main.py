@@ -6,13 +6,14 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from riven_api import models  # noqa: F401  (registers tables on Base.metadata)
 from riven_api.config import get_settings
-from riven_api.db import create_tables, get_engine
+from riven_api.db import create_tables, get_engine, seed_demo_user
 from riven_api.routers import auth, health
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     await create_tables(get_engine())
+    await seed_demo_user(get_engine())
     yield
 
 

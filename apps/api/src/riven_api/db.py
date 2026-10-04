@@ -1,6 +1,7 @@
 from collections.abc import AsyncIterator
 from functools import lru_cache
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -29,6 +30,28 @@ def _sessionmaker() -> async_sessionmaker[AsyncSession]:
 async def create_tables(engine: AsyncEngine) -> None:
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+
+
+async def seed_demo_user(engine: AsyncEngine) -> None:
+    """Create the development account once (see `Settings.demo_*`); no-op when disabled."""
+    from riven_api.models import User
+    from riven_api.security import hash_password
+
+    settings = get_settings()
+    if not settings.demo_user_active:
+        return
+    email = settings.demo_email.lower()
+    async with async_sessionmaker(engine)() as session:
+        if await session.scalar(select(User).where(User.email == email)):
+            return
+        session.add(
+            User(
+                email=email,
+                name=settings.demo_username,
+                password_hash=hash_password(settings.demo_password.get_secret_value()),
+            )
+        )
+        await session.commit()
 
 
 async def get_session() -> AsyncIterator[AsyncSession]:

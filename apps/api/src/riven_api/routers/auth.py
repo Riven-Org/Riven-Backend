@@ -3,10 +3,11 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, EmailStr, Field
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from riven_api.config import get_settings
 from riven_api.db import get_session
 from riven_api.models import User
 from riven_api.security import create_token, hash_password, read_token, verify_password
@@ -24,7 +25,8 @@ class SignUp(BaseModel):
 
 
 class LogIn(BaseModel):
-    email: EmailStr
+    # An email, or the development account's username. `email` is accepted for older clients.
+    identifier: str = Field(validation_alias=AliasChoices("identifier", "email"), min_length=1)
     password: str
 
 
@@ -75,7 +77,11 @@ async def signup(body: SignUp, session: Session) -> AuthResult:
 
 @router.post("/auth/login")
 async def login(body: LogIn, session: Session) -> AuthResult:
-    user = await session.scalar(select(User).where(func.lower(User.email) == body.email.lower()))
+    email = body.identifier.strip().lower()
+    settings = get_settings()
+    if settings.demo_user_active and email == settings.demo_username.lower():
+        email = settings.demo_email.lower()
+    user = await session.scalar(select(User).where(func.lower(User.email) == email))
     if user is None or not verify_password(user.password_hash, body.password):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Wrong email or password")
     return _result(user)

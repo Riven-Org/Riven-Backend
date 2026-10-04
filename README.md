@@ -31,8 +31,12 @@ make api            # http://localhost:8000/docs — creates ./riven.db on first
 | GET | `/health` | Liveness |
 | GET | `/health/ready` | Database reachable |
 | POST | `/v1/auth/signup` | `{name, email, password}` → `{access_token, user}` |
-| POST | `/v1/auth/login` | `{email, password}` → `{access_token, user}` |
+| POST | `/v1/auth/login` | `{identifier, password}` (email, or the dev username) → `{access_token, user}` |
 | GET | `/v1/me` | Current user (`Authorization: Bearer <token>`) |
+
+In development the API creates an account on startup: username **Abubakar**, password **12345**
+(email `abubakar@riven.local`). Turn it off with `RIVEN_DEMO_USER_ENABLED=false`; staging and prod
+refuse to start while it is on.
 
 ## Everyday commands
 

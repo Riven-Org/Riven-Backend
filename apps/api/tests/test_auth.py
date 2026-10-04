@@ -62,3 +62,19 @@ def test_me_needs_a_valid_token(client: TestClient) -> None:
     me = client.get("/v1/me", headers={"Authorization": f"Bearer {token}"})
     assert me.status_code == 200
     assert me.json()["email"] == "ada@example.com"
+
+
+def test_demo_user_signs_in_with_username_or_email(client: TestClient) -> None:
+    by_name = client.post("/v1/auth/login", json={"identifier": "abubakar", "password": "12345"})
+    by_email = client.post(
+        "/v1/auth/login", json={"email": "abubakar@riven.local", "password": "12345"}
+    )
+
+    assert by_name.status_code == by_email.status_code == 200
+    assert by_name.json()["user"]["name"] == "Abubakar"
+
+
+def test_demo_user_wrong_password(client: TestClient) -> None:
+    response = client.post("/v1/auth/login", json={"identifier": "Abubakar", "password": "nope"})
+
+    assert response.status_code == 401
