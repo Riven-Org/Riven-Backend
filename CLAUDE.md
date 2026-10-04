@@ -24,63 +24,27 @@ Domain terms used across tickets and code:
 
 ## Current state
 
-Only the foundation scaffold exists: health endpoints, settings, DB session, the pipeline workflow with **placeholder activities**, shared schemas. The FYP MVP described as "Baseline B01–B08" in `docs/tickets/INDEX.md` is **specified but not implemented**. When a ticket says "port the MVP X" or "MVP scenario still passes", build X fresh to the spec and treat the MVP 15-step scenario (change → capture → sandbox → verify → bug found → stored → fixed → fix verified → lock created → later change → lock re-run → recurrence detected → graph shows links → dashboard shows history) as the target behaviour.
-
-The dashboard lives in [Riven-Frontend](https://github.com/Riven-Org/Riven-Frontend).
+**Reset to a minimal app (ADR 0014, branch `RESET-minimal-auth`).** The API is one FastAPI service on SQLite with email + password sign-up/login and JWT bearer tokens. Everything else (Keycloak, Postgres/RLS, orgs/roles/API keys, Temporal worker, events, object storage, shared schemas, Docker) was removed and lives in git history; tickets that depend on it must bring the needed piece back first. The dashboard lives in [Riven-Frontend](https://github.com/Riven-Org/Riven-Frontend).
 
 ## Commands
 
 Run from the repo root (settings read `.env` from the working directory).
 
 ```bash
-uv sync                                  # install workspace
+uv sync                                  # install
 make check                               # = CI: ruff check, ruff format --check, mypy --strict, pytest
-uv run pytest apps/api/tests/test_health.py::test_health_returns_ok    # single test
-uv run pytest -k workflow                # by keyword
+uv run pytest apps/api/tests/test_auth.py::test_me_needs_a_valid_token   # single test
 make fmt                                 # auto-fix lint + format
-make dev                                 # whole stack in Docker + migrations + demo seed (CI job `stack` runs it)
-make up && make migrate                  # infra only (Postgres(pgvector)/Redis/S3 (SeaweedFS)/Temporal), then Alembic
-make seed                                # demo org `demo` / repo `riven-demo/shop` (idempotent)
-make api                                 # :8000, OpenAPI docs at /docs
-make worker                              # Temporal worker, task queue "verification"
-uv run alembic -c apps/api/alembic.ini revision --autogenerate -m "<ID>: <what>"
+make api                                 # :8000, OpenAPI docs at /docs; creates ./riven.db on start
 ```
-
-Docker is not installed on the maintainer's machine; `make up`/`make dev` may be unavailable locally. Anything needing Postgres/Temporal must also work in CI: the `python` job has Postgres (pgvector) and Redis service containers, and the `stack` job runs `make dev` and checks every container is healthy. New services go in `docker-compose.yml` (one `Dockerfile` image serves every Python service).
 
 ## Architecture and conventions
 
-Decisions and reasons: `docs/adr/` (0001 stack, 0002 service decomposition and data ownership, 0003–0010 one per service, 0011 shared persistence package and object storage, 0012 configuration and secrets, 0013 identity and access). New significant decisions get a new numbered ADR in the same PR.
-
-**Workspace** (uv): `apps/api` (`riven_api`), `apps/worker` (`riven_worker`), `packages/schemas` (`riven_schemas`), `packages/events` (`riven_events`), `packages/db` (`riven_db`), `packages/storage` (`riven_storage`), `packages/config` (`riven_config`). mypy strict covers every `src/` tree; ruff treats the packages as first-party.
-
-**Configuration** (`riven_config`, S02.2, ADR 0012) — every service's settings subclass the blocks in `riven_config` (`DatabaseSettings`, `RedisSettings`, `TemporalSettings`, `StorageSettings`) and are built with `.load()` at startup, which exits on invalid config. Never read `os.environ` directly. Secrets are `SecretStr` (call `.get_secret_value()` only where the value is used) and can come from files in `RIVEN_SECRETS_DIR`. Staging/prod reject development credentials.
-
-**Auth and tenancy** (E03, ADR 0013) — Keycloak realm as code in `infra/keycloak/realm-riven.json`. Every `/v1` endpoint depends on `current_principal` (JWT validated against the realm JWKS). Org endpoints go under `/v1/orgs/{org_id}/…` and take `CurrentOrg` (membership check, 404 for outsiders); read and write domain data only through `TenantSession`, which row-level security confines to the org. New tenant tables need `enable_rls(op, "<table>")` in their migration. Graph data only through `riven_db.graph_repository.GraphRepository`. Tests: `FakeIdP`/`FakeMailer` and the `ALICE`/`BOB`/`CAROL` users in `apps/api/tests/api_fakes.py` via the `client`, `auth(...)` and `mailer` fixtures; `test_cross_tenant.py` automatically attacks every new org endpoint. Keycloak admin calls (MFA status, sessions) go through `riven_api.services.idp_admin.get_idp_admin`; tests use the `idp_admin` fixture (`FakeIdpAdmin`).
-
-**Events** (`riven_events`, S01.3) — publish a domain event with `add_event(session, event, org_id=...)` inside the same transaction as the state change; never write to Redis directly. `make relay` runs the outbox relay (→ Redis Stream `riven:events`). Consume with `EventConsumer(name, sessions, redis, {"<type>": handler})`: the handler runs in the transaction that records the event as processed, so do all side effects through that session. New events: add to `EVENTS` and `catalog.ROUTES`, then `make catalog` (the catalog test fails otherwise). Catalog: `docs/events.md`.
-
-**`packages/schemas`** — every payload that crosses a service boundary (API ↔ worker, events, Temporal inputs/outputs). Never define such a model inside one app. Events subclass `DomainEvent` with a `type: Literal["noun.verb"]`. Register every contract in `contracts.py`; `test_contracts.py` compares it with the committed baseline in `packages/schemas/contracts/v<SCHEMA_VERSION>/`. Additive changes pass; a breaking change fails CI until you bump `SCHEMA_VERSION` and write a new baseline (`uv run python -m riven_schemas.export --snapshot`). Service boundaries and table ownership: ADRs 0002–0010.
-
-**`apps/api`** — build new features in this shape:
-- `routers/<resource>.py`: thin HTTP layer, mounted under `/v1` (health stays unversioned), with `APIRouter(..., route_class=PermissionedRoute)`. Every endpoint declares its access or the app will not start: org endpoints take `ctx: Annotated[OrgContext, Requires(Permission.X)]`; endpoints about the caller depend on `CurrentPrincipal`; truly public ones pass `openapi_extra={"x-riven-public": True}`. New permissions go in `riven_api/auth/permissions.py` (`MATRIX`), then regenerate `docs/permissions.md`.
-- `services/<area>.py`: business logic; routers call services, services take an `AsyncSession`.
-- Models: SQLAlchemy 2.0 typed models live in `packages/db` (`riven_db.models.<owning service>`, ADR 0011) because worker services own tables too. Every domain table uses `TenantMixin` (non-null indexed `org_id`); queries are always org-scoped. Export new model modules from `riven_db/models/__init__.py` so autogenerate and the drift test see them.
-- Every schema change is an Alembic migration named `<ID>: …`; never edit an applied migration. `packages/db/tests/test_migrations.py` fails when models and migrations drift.
-- Logs and artifacts go to object storage through `riven_storage.ObjectStore` (SeaweedFS locally, S3 in the cloud), downloaded via presigned URLs; services never write to local disk (a test enforces it).
-- Tests use `create_app()` + `app.dependency_overrides[get_session]`; no test may require a live external service unless CI provides it. CI provides Postgres (pgvector) and Redis: tests using the root `conftest.py` fixtures (`sessions`, `db_engine`, `redis`) run against a migrated database when `RIVEN_TEST_DATABASE_URL` is set and are skipped otherwise; `redis` falls back to fakeredis.
-
-**`apps/worker`** — pipeline logic lives in activities; `VerificationWorkflow` only orchestrates. Workflow code must stay deterministic (no I/O, clock, randomness; imports of app code inside `workflow.unsafe.imports_passed_through()`). Register new activities in `ALL_ACTIVITIES` with an explicit timeout and `STAGE_RETRY`. Client and worker must both use `pydantic_data_converter`. `workflow_id_for()` is the idempotency key per (org, repo, commit) — keep it stable.
-
-**Causal graph** — Postgres tables (`graph_nodes`, `graph_edges`), not a graph database. Every edge carries provenance: source, confidence, created_by, and valid_from/valid_to (close edges, never delete). Traversals use recursive CTEs, and all access goes through `riven_db.graph_repository` (a test blocks graph SQL anywhere else).
-
-**LLM calls** — go through a single gateway module (built in S11.3: budgets, caching, secret redaction). Features never call a provider SDK directly. Default provider is the Claude API; secrets and customer code must be redacted before any call.
-
-**Sandbox** — runs untrusted customer and AI-generated code. Deny network egress by default, cap CPU/memory/time, and classify infrastructure failures (timeout, OOM) separately from code failures — infra failures never create bugs.
-
-**Infra tickets** (Terraform, Helm, Kubernetes, Argo) live under `infra/` in this repo until a dedicated repo exists.
-
-**Cost** — the org is on free plans (GitHub Free, ClickUp Free Forever). Choose self-hosted/open-source options; never add a paid service, licensed GitHub Action, or larger runner. If a ticket's suggested tech is paid, use the free alternative and say so in the PR.
+- `apps/api/src/riven_api`: `create_app()` factory; `config.py` (`Settings`, env prefix `RIVEN_`, never read `os.environ` directly); `db.py` (`Base`, async engine, `get_session` dependency; tables created in the app lifespan); `models.py` (SQLAlchemy 2.0 typed models); `security.py` (Argon2 hashing, JWT create/read); `routers/` (thin HTTP layer, mounted under `/v1`, health unversioned).
+- Endpoints needing a signed-in user depend on `current_user` from `routers/auth.py`.
+- Tests use the `client` fixture in `apps/api/tests/conftest.py` (fresh SQLite file per test, lifespan run by `TestClient`).
+- mypy strict covers `apps/api/src`; ruff treats `riven_api` as first-party.
+- New significant decisions get a new numbered ADR in `docs/adr/`.
 
 ## Guardrails (enforced)
 

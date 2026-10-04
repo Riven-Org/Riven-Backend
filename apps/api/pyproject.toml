@@ -4,19 +4,13 @@ version = "0.1.0"
 description = "Riven public API"
 requires-python = ">=3.12"
 dependencies = [
-    "riven-schemas",
-    "riven-events",
-    "riven-db",
-    "riven-storage",
     "fastapi>=0.115",
     "uvicorn[standard]>=0.30",
-    "riven-config",
+    "pydantic-settings>=2.4",
     "sqlalchemy[asyncio]>=2.0",
-    "asyncpg>=0.29",
-    "alembic>=1.13",
-    "pgvector>=0.3",
+    "aiosqlite>=0.20",
     "httpx>=0.27",
-    "pyjwt[crypto]>=2.9",
+    "pyjwt>=2.9",
     "email-validator>=2.1",
     "argon2-cffi>=23.1",
 ]

@@ -30,9 +30,3 @@ def test_ready_returns_503_when_database_is_down() -> None:
 
     assert response.status_code == 503
     assert response.json()["database"] == "down"
-
-
-def test_meta_reports_schema_version() -> None:
-    response = TestClient(create_app()).get("/v1/meta")
-
-    assert response.json()["schema_version"] == "1"

@@ -1,16 +1,24 @@
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from riven_api.auth.access import PermissionedRoute
+from riven_api import models  # noqa: F401  (registers tables on Base.metadata)
 from riven_api.config import get_settings
-from riven_api.routers import changes, health, me, orgs, service_accounts
-from riven_schemas import SCHEMA_VERSION
+from riven_api.db import create_tables, get_engine
+from riven_api.routers import auth, health
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    await create_tables(get_engine())
+    yield
 
 
 def create_app() -> FastAPI:
     settings = get_settings()
-    app = FastAPI(title="Riven API", version="0.1.0")
-    app.router.route_class = PermissionedRoute
+    app = FastAPI(title="Riven API", version="0.1.0", lifespan=lifespan)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,
@@ -18,15 +26,7 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
     app.include_router(health.router)
-    app.include_router(me.router)
-    app.include_router(orgs.router)
-    app.include_router(service_accounts.router)
-    app.include_router(changes.router)
-
-    @app.get("/v1/meta", openapi_extra={"x-riven-public": True})
-    async def meta() -> dict[str, str]:
-        return {"env": settings.env.value, "schema_version": SCHEMA_VERSION}
-
+    app.include_router(auth.router)
     return app
 
 
