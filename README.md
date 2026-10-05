@@ -33,6 +33,17 @@ make api            # http://localhost:8000/docs — creates ./riven.db on first
 | POST | `/v1/auth/signup` | `{name, email, password}` → `{access_token, user}` |
 | POST | `/v1/auth/login` | `{identifier, password}` (email, or the dev username) → `{access_token, user}` |
 | GET | `/v1/me` | Current user (`Authorization: Bearer <token>`) |
+| GET | `/v1/dashboard` | Totals, pass rate, producers, last 14 days, recent changes, open bugs |
+| GET/POST | `/v1/projects` | List / create projects |
+| DELETE | `/v1/projects/{id}` | Delete a project with its changes and bugs |
+| GET/POST | `/v1/changes` | List (`?project_id=`, `?status=`) / log a change |
+| POST | `/v1/changes/{id}/verdict` | `passed` / `failed` (+ bug) / `needs_review` |
+| GET | `/v1/bugs` | List (`?status=open\|fixed`) |
+| POST | `/v1/bugs/{id}/fix` | Mark fixed, optionally by a passing change in the same project |
+
+Everything under `/v1` except auth needs a bearer token and only sees the caller's own data.
+**Riven never approves its own work:** a human change you logged yourself can't get a verdict from
+you (409).
 
 In development the API creates an account on startup: username **Abubakar**, password **12345**
 (email `abubakar@riven.local`). Turn it off with `RIVEN_DEMO_USER_ENABLED=false`; staging and prod

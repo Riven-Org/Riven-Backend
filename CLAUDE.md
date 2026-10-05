@@ -42,6 +42,7 @@ make api                                 # :8000, OpenAPI docs at /docs; creates
 
 - `apps/api/src/riven_api`: `create_app()` factory; `config.py` (`Settings`, env prefix `RIVEN_`, never read `os.environ` directly); `db.py` (`Base`, async engine, `get_session` dependency; tables created in the app lifespan); `models.py` (SQLAlchemy 2.0 typed models); `security.py` (Argon2 hashing, JWT create/read); `routers/` (thin HTTP layer, mounted under `/v1`, health unversioned).
 - Endpoints needing a signed-in user depend on `current_user` from `routers/auth.py`.
+- Domain: `Project`, `Change`, `Bug` in `models.py` (every row has `owner_id`; every query filters by it, 404 for others' rows). Bodies in `schemas.py`; logic in `services/work.py`; routes in `routers/work.py`. The self-approval rule (`_self_produced`) lives in the service. SQLite doesn't enforce foreign keys, so deletes remove dependents explicitly.
 - Tests use the `client` fixture in `apps/api/tests/conftest.py` (fresh SQLite file per test, lifespan run by `TestClient`).
 - mypy strict covers `apps/api/src`; ruff treats `riven_api` as first-party.
 - New significant decisions get a new numbered ADR in `docs/adr/`.
