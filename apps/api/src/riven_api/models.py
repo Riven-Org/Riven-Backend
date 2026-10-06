@@ -1,10 +1,10 @@
 from datetime import UTC, datetime
 from uuid import uuid4
 
-from sqlalchemy import DateTime, ForeignKey, String, UniqueConstraint
+from sqlalchemy import ForeignKey, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
-from riven_api.db import Base
+from riven_api.db import Base, UTCDateTime
 
 
 class User(Base):
@@ -14,9 +14,7 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(320), unique=True, index=True)
     name: Mapped[str] = mapped_column(String(120))
     password_hash: Mapped[str] = mapped_column(String(255))
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=lambda: datetime.now(UTC)
-    )
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=lambda: datetime.now(UTC))
 
 
 def _now() -> datetime:
@@ -38,7 +36,7 @@ class Project(Base):
     name: Mapped[str] = mapped_column(String(80))
     repo_url: Mapped[str] = mapped_column(String(300), default="")
     description: Mapped[str] = mapped_column(String(500), default="")
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=_now)
 
 
 class Change(Base):
@@ -59,8 +57,8 @@ class Change(Base):
     note: Mapped[str] = mapped_column(String(1000), default="")
     created_by: Mapped[str] = mapped_column(ForeignKey("users.id"))
     verified_by: Mapped[str | None] = mapped_column(ForeignKey("users.id"), default=None)
-    verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, index=True)
+    verified_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), default=None)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=_now, index=True)
 
 
 class Bug(Base):
@@ -80,5 +78,5 @@ class Bug(Base):
     fixed_by_change_id: Mapped[str | None] = mapped_column(
         ForeignKey("changes.id", ondelete="SET NULL"), default=None
     )
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
-    fixed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=_now)
+    fixed_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), default=None)

@@ -175,3 +175,13 @@ def test_deleting_a_project_removes_its_changes_and_bugs(client: TestClient) -> 
     assert client.delete(f"/v1/projects/{project['id']}", headers=auth).status_code == 204
     assert client.get("/v1/changes", headers=auth).json() == []
     assert client.get("/v1/bugs", headers=auth).json() == []
+
+
+def test_timestamps_are_utc_with_an_offset(client: TestClient) -> None:
+    auth = _auth(client)
+
+    project = _project(client, auth)
+    me = client.get("/v1/me", headers=auth).json()
+
+    assert project["created_at"].endswith(("Z", "+00:00"))
+    assert me["created_at"].endswith(("Z", "+00:00"))

@@ -1,7 +1,8 @@
 from collections.abc import AsyncIterator
+from datetime import UTC, datetime
 from functools import lru_cache
 
-from sqlalchemy import select
+from sqlalchemy import DateTime, Dialect, select
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -9,12 +10,30 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy.types import TypeDecorator
 
 from riven_api.config import get_settings
 
 
 class Base(DeclarativeBase):
     pass
+
+
+class UTCDateTime(TypeDecorator[datetime]):
+    """Stores UTC and always returns timezone-aware UTC (SQLite drops the offset otherwise)."""
+
+    impl = DateTime
+    cache_ok = True
+
+    def process_bind_param(self, value: datetime | None, dialect: Dialect) -> datetime | None:
+        if value is None:
+            return None
+        if value.tzinfo is None:
+            value = value.replace(tzinfo=UTC)
+        return value.astimezone(UTC).replace(tzinfo=None)
+
+    def process_result_value(self, value: datetime | None, dialect: Dialect) -> datetime | None:
+        return value.replace(tzinfo=UTC) if value is not None else None
 
 
 @lru_cache

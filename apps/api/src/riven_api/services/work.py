@@ -329,7 +329,7 @@ async def dashboard(session: AsyncSession, user: User, today: date | None = None
     verified: dict[date, int] = {}
     rows = await session.execute(
         select(Change.created_at, Change.verified_at).where(
-            Change.owner_id == user.id, Change.created_at >= since.replace(tzinfo=None)
+            Change.owner_id == user.id, Change.created_at >= since
         )
     )
     for created_at, verified_at in rows.tuples():
