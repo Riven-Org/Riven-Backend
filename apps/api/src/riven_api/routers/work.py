@@ -2,13 +2,14 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from riven_api.db import get_session
 from riven_api.models import User
 from riven_api.routers.auth import current_user
 from riven_api.schemas import (
+    ActivityItem,
     BugFixIn,
     BugOut,
     BugStatus,
@@ -24,13 +25,33 @@ from riven_api.services import work
 
 router = APIRouter(prefix="/v1", tags=["work"])
 
+# Dashboard periods, in days.
+PERIODS = (7, 14, 30)
+
 Session = Annotated[AsyncSession, Depends(get_session)]
 Me = Annotated[User, Depends(current_user)]
 
 
 @router.get("/dashboard")
-async def dashboard(session: Session, user: Me) -> DashboardOut:
-    return await work.dashboard(session, user)
+async def dashboard(
+    session: Session,
+    user: Me,
+    days: int = 7,
+    project_id: str | None = None,
+) -> DashboardOut:
+    if days not in PERIODS:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "days must be 7, 14 or 30")
+    return await work.dashboard(session, user, days=days, project_id=project_id)
+
+
+@router.get("/activity")
+async def activity(
+    session: Session,
+    user: Me,
+    project_id: str | None = None,
+    limit: Annotated[int, Query(ge=1, le=100)] = 20,
+) -> list[ActivityItem]:
+    return await work.activity(session, user, project_id=project_id, limit=limit)
 
 
 @router.get("/projects")
@@ -73,9 +94,10 @@ async def record_verdict(change_id: str, body: VerdictIn, session: Session, user
 async def list_bugs(
     session: Session,
     user: Me,
+    project_id: str | None = None,
     status_: Annotated[BugStatus | None, Query(alias="status")] = None,
 ) -> list[BugOut]:
-    return await work.list_bugs(session, user, status_=status_)
+    return await work.list_bugs(session, user, project_id=project_id, status_=status_)
 
 
 @router.post("/bugs/{bug_id}/fix")

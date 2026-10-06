@@ -33,12 +33,13 @@ make api            # http://localhost:8000/docs — creates ./riven.db on first
 | POST | `/v1/auth/signup` | `{name, email, password}` → `{access_token, user}` |
 | POST | `/v1/auth/login` | `{identifier, password}` (email, or the dev username) → `{access_token, user}` |
 | GET | `/v1/me` | Current user (`Authorization: Bearer <token>`) |
-| GET | `/v1/dashboard` | Totals, pass rate, producers, last 14 days, recent changes, open bugs |
+| GET | `/v1/dashboard` | `?days=7\|14\|30&project_id=`: totals, KPIs with previous period and daily series, verdict trend, producers, active work, recent verdicts, open bugs, bug→fix chains |
+| GET | `/v1/activity` | Recent events (change logged, verdict, bug found, bug fixed) derived from timestamps |
 | GET/POST | `/v1/projects` | List / create projects |
 | DELETE | `/v1/projects/{id}` | Delete a project with its changes and bugs |
 | GET/POST | `/v1/changes` | List (`?project_id=`, `?status=`) / log a change |
 | POST | `/v1/changes/{id}/verdict` | `passed` / `failed` (+ bug) / `needs_review` |
-| GET | `/v1/bugs` | List (`?status=open\|fixed`) |
+| GET | `/v1/bugs` | List (`?status=open\|fixed`, `?project_id=`) |
 | POST | `/v1/bugs/{id}/fix` | Mark fixed, optionally by a passing change in the same project |
 
 Everything under `/v1` except auth needs a bearer token and only sees the caller's own data.

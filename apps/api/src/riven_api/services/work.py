@@ -9,15 +9,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from riven_api.models import Bug, Change, Project, User
 from riven_api.schemas import (
+    ActivityItem,
     BugFixIn,
     BugOut,
     ChangeIn,
     ChangeOut,
     DashboardOut,
-    DayCount,
+    Kpi,
+    Kpis,
     ProjectIn,
     ProjectOut,
     Totals,
+    TrendDay,
     VerdictIn,
 )
 
@@ -110,12 +113,25 @@ async def delete_project(session: AsyncSession, user: User, project_id: str) -> 
     await session.commit()
 
 
+# ---------------------------------------------------------------- numbering
+
+
+async def _numbers(
+    session: AsyncSession, user: User, model: type[Change] | type[Bug]
+) -> dict[str, int]:
+    """Per-user sequence numbers (#1, #2, …) by creation order, without storing them."""
+    n = func.row_number().over(order_by=(model.created_at, model.id))
+    rows = await session.execute(select(model.id, n).where(model.owner_id == user.id))
+    return dict(rows.tuples().all())
+
+
 # ---------------------------------------------------------------- changes
 
 
-def _change_out(change: Change, project_name: str, user: User) -> ChangeOut:
+def _change_out(change: Change, project_name: str, user: User, number: int = 0) -> ChangeOut:
     return ChangeOut(
         id=change.id,
+        number=number,
         project_id=change.project_id,
         project_name=project_name,
         commit=change.commit,
@@ -143,7 +159,10 @@ async def _changes_out(
         .tuples()
         .all()
     )
-    return [_change_out(c, names.get(c.project_id, ""), user) for c in changes]
+    numbers = await _numbers(session, user, Change)
+    return [
+        _change_out(c, names.get(c.project_id, ""), user, numbers.get(c.id, 0)) for c in changes
+    ]
 
 
 async def list_changes(
@@ -176,7 +195,7 @@ async def create_change(session: AsyncSession, user: User, body: ChangeIn) -> Ch
     )
     session.add(change)
     await session.commit()
-    return _change_out(change, project.name, user)
+    return (await _changes_out(session, user, [change]))[0]
 
 
 async def _get_change(session: AsyncSession, user: User, change_id: str) -> Change:
@@ -213,8 +232,7 @@ async def record_verdict(
             )
         )
     await session.commit()
-    project = await session.get(Project, change.project_id)
-    return _change_out(change, project.name if project else "", user)
+    return (await _changes_out(session, user, [change]))[0]
 
 
 # ---------------------------------------------------------------- bugs
@@ -229,9 +247,11 @@ async def _bugs_out(session: AsyncSession, user: User, bugs: Sequence[Bug]) -> l
     ids = {b.change_id for b in bugs} | {b.fixed_by_change_id for b in bugs if b.fixed_by_change_id}
     rows = await session.execute(select(Change.id, Change.commit).where(Change.id.in_(ids)))
     commits = dict(rows.tuples().all())
+    numbers = await _numbers(session, user, Bug)
     return [
         BugOut(
             id=b.id,
+            number=numbers.get(b.id, 0),
             project_id=b.project_id,
             project_name=names.get(b.project_id, ""),
             change_id=b.change_id,
@@ -248,9 +268,16 @@ async def _bugs_out(session: AsyncSession, user: User, bugs: Sequence[Bug]) -> l
 
 
 async def list_bugs(
-    session: AsyncSession, user: User, *, status_: str | None = None, limit: int = 200
+    session: AsyncSession,
+    user: User,
+    *,
+    project_id: str | None = None,
+    status_: str | None = None,
+    limit: int = 200,
 ) -> list[BugOut]:
     query = select(Bug).where(Bug.owner_id == user.id)
+    if project_id:
+        query = query.where(Bug.project_id == project_id)
     if status_:
         query = query.where(Bug.status == status_)
     rows = (await session.scalars(query.order_by(Bug.created_at.desc()).limit(limit))).all()
@@ -283,76 +310,186 @@ async def fix_bug(session: AsyncSession, user: User, bug_id: str, body: BugFixIn
 
 # ---------------------------------------------------------------- dashboard
 
-DAYS = 14
+
+def _day(value: datetime) -> date:
+    return _utc(value).date()
 
 
-async def dashboard(session: AsyncSession, user: User, today: date | None = None) -> DashboardOut:
+def _kpi(per_day: dict[date, int], days: list[date], previous: int) -> Kpi:
+    return Kpi(
+        value=sum(per_day.get(d, 0) for d in days),
+        previous=previous,
+        series=[per_day.get(d, 0) for d in days],
+    )
+
+
+async def dashboard(
+    session: AsyncSession,
+    user: User,
+    *,
+    days: int = 7,
+    project_id: str | None = None,
+    today: date | None = None,
+) -> DashboardOut:
+    if project_id:
+        await get_project(session, user, project_id)
     today = today or datetime.now(UTC).date()
-    since = datetime.combine(today - timedelta(days=DAYS - 1), datetime.min.time(), UTC)
+    period = [today - timedelta(days=days - 1 - i) for i in range(days)]
+    start = period[0]
+    prev_start = start - timedelta(days=days)
 
-    statuses = dict(
-        (
-            await session.execute(
-                select(Change.status, func.count())
-                .where(Change.owner_id == user.id)
-                .group_by(Change.status)
-            )
-        )
-        .tuples()
-        .all()
-    )
-    producers = dict(
-        (
-            await session.execute(
-                select(Change.producer, func.count())
-                .where(Change.owner_id == user.id)
-                .group_by(Change.producer)
-            )
-        )
-        .tuples()
-        .all()
-    )
-    bugs = dict(
-        (
-            await session.execute(
-                select(Bug.status, func.count()).where(Bug.owner_id == user.id).group_by(Bug.status)
-            )
-        )
-        .tuples()
-        .all()
-    )
+    change_q = select(Change).where(Change.owner_id == user.id)
+    bug_q = select(Bug).where(Bug.owner_id == user.id)
+    if project_id:
+        change_q = change_q.where(Change.project_id == project_id)
+        bug_q = bug_q.where(Bug.project_id == project_id)
+    changes = (await session.scalars(change_q)).all()
+    bugs = (await session.scalars(bug_q)).all()
+
+    logged: dict[date, int] = {}
+    judged: dict[date, int] = {}
+    verdicts: dict[tuple[date, str], int] = {}
+    prev_logged = prev_judged = 0
+    for c in changes:
+        d = _day(c.created_at)
+        logged[d] = logged.get(d, 0) + 1
+        prev_logged += prev_start <= d < start
+        if c.verified_at:
+            v = _day(c.verified_at)
+            judged[v] = judged.get(v, 0) + 1
+            verdicts[(v, c.status)] = verdicts.get((v, c.status), 0) + 1
+            prev_judged += prev_start <= v < start
+    found: dict[date, int] = {}
+    prev_found = 0
+    for b in bugs:
+        d = _day(b.created_at)
+        found[d] = found.get(d, 0) + 1
+        prev_found += prev_start <= d < start
+    remembered = [sum(1 for b in bugs if _day(b.created_at) <= d) for d in period]
+    before = sum(1 for b in bugs if _day(b.created_at) < start)
+
+    status_counts = {
+        k: sum(1 for c in changes if c.status == k)
+        for k in ("pending", "passed", "failed", "needs_review")
+    }
+    passed, failed = status_counts["passed"], status_counts["failed"]
     projects = await session.scalar(
         select(func.count()).select_from(Project).where(Project.owner_id == user.id)
     )
-
-    logged: dict[date, int] = {}
-    verified: dict[date, int] = {}
-    rows = await session.execute(
-        select(Change.created_at, Change.verified_at).where(
-            Change.owner_id == user.id, Change.created_at >= since
-        )
+    newest = sorted(changes, key=lambda c: _utc(c.created_at), reverse=True)
+    judged_newest = sorted(
+        (c for c in changes if c.verified_at),
+        key=lambda c: _utc(c.verified_at or c.created_at),
+        reverse=True,
     )
-    for created_at, verified_at in rows.tuples():
-        logged[_utc(created_at).date()] = logged.get(_utc(created_at).date(), 0) + 1
-        if verified_at:
-            verified[_utc(verified_at).date()] = verified.get(_utc(verified_at).date(), 0) + 1
-    days = [today - timedelta(days=DAYS - 1 - i) for i in range(DAYS)]
+    bugs_newest = sorted(bugs, key=lambda b: _utc(b.created_at), reverse=True)
 
-    passed, failed = statuses.get("passed", 0), statuses.get("failed", 0)
     return DashboardOut(
+        days=days,
+        project_id=project_id,
         totals=Totals(
             projects=projects or 0,
-            changes=sum(statuses.values()),
-            pending=statuses.get("pending", 0),
+            changes=len(changes),
+            pending=status_counts["pending"],
             passed=passed,
             failed=failed,
-            needs_review=statuses.get("needs_review", 0),
-            open_bugs=bugs.get("open", 0),
-            fixed_bugs=bugs.get("fixed", 0),
+            needs_review=status_counts["needs_review"],
+            open_bugs=sum(1 for b in bugs if b.status == "open"),
+            fixed_bugs=sum(1 for b in bugs if b.status == "fixed"),
+        ),
+        kpis=Kpis(
+            changes=_kpi(logged, period, prev_logged),
+            verified=_kpi(judged, period, prev_judged),
+            bugs=_kpi(found, period, prev_found),
+            memories=Kpi(value=len(bugs), previous=before, series=remembered),
         ),
         pass_rate=passed / (passed + failed) if passed + failed else None,
-        by_producer={k: producers.get(k, 0) for k in ("human", "ai_agent", "bot")},
-        daily=[DayCount(day=d, logged=logged.get(d, 0), verified=verified.get(d, 0)) for d in days],
-        recent=await list_changes(session, user, limit=6),
-        open_bugs=await list_bugs(session, user, status_="open", limit=5),
+        by_producer={
+            k: sum(1 for c in changes if c.producer == k) for k in ("human", "ai_agent", "bot")
+        },
+        trend=[
+            TrendDay(
+                day=d,
+                logged=logged.get(d, 0),
+                passed=verdicts.get((d, "passed"), 0),
+                failed=verdicts.get((d, "failed"), 0),
+                needs_review=verdicts.get((d, "needs_review"), 0),
+            )
+            for d in period
+        ],
+        recent=await _changes_out(session, user, newest[:6]),
+        active=await _changes_out(
+            session, user, [c for c in newest if c.status in ("pending", "needs_review")][:8]
+        ),
+        runs=await _changes_out(session, user, judged_newest[:6]),
+        open_bugs=await _bugs_out(
+            session, user, [b for b in bugs_newest if b.status == "open"][:5]
+        ),
+        chains=await _bugs_out(session, user, bugs_newest[:4]),
     )
+
+
+# ---------------------------------------------------------------- activity
+
+
+async def activity(
+    session: AsyncSession, user: User, *, project_id: str | None = None, limit: int = 20
+) -> list[ActivityItem]:
+    """What happened recently, derived from timestamps on changes and bugs."""
+    changes = await list_changes(session, user, project_id=project_id, limit=limit)
+    bugs = await list_bugs(session, user, project_id=project_id, limit=limit)
+    items: list[ActivityItem] = []
+    for c in changes:
+        items.append(
+            ActivityItem(
+                kind="change_logged",
+                at=c.created_at,
+                number=c.number,
+                title=c.title,
+                detail=f"Logged by {c.author or c.producer.replace('_', ' ')}",
+                project_name=c.project_name,
+                status="pending",
+            )
+        )
+        if c.verified_at:
+            items.append(
+                ActivityItem(
+                    kind="verdict",
+                    at=c.verified_at,
+                    number=c.number,
+                    title=c.title,
+                    detail={
+                        "passed": "Verified successfully",
+                        "failed": "Failed verification",
+                        "needs_review": "Flagged for review",
+                    }.get(c.status, c.status),
+                    project_name=c.project_name,
+                    status=c.status,
+                )
+            )
+    for b in bugs:
+        items.append(
+            ActivityItem(
+                kind="bug_found",
+                at=b.created_at,
+                number=b.number,
+                title=b.title,
+                detail=f"Remembered from {b.change_commit[:7]}",
+                project_name=b.project_name,
+                status="open",
+            )
+        )
+        if b.fixed_at:
+            items.append(
+                ActivityItem(
+                    kind="bug_fixed",
+                    at=b.fixed_at,
+                    number=b.number,
+                    title=b.title,
+                    detail=f"Fixed by {b.fixed_by_commit[:7]}" if b.fixed_by_commit else "Fixed",
+                    project_name=b.project_name,
+                    status="fixed",
+                )
+            )
+    items.sort(key=lambda i: i.at, reverse=True)
+    return items[:limit]

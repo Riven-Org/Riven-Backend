@@ -144,7 +144,7 @@ def test_dashboard_summarises_real_activity(client: TestClient) -> None:
     summary = client.get("/v1/dashboard", headers=auth).json()
 
     assert empty["pass_rate"] is None
-    assert len(empty["daily"]) == 14
+    assert len(empty["trend"]) == 7
     assert summary["totals"] == {
         "projects": 1,
         "changes": 5,
@@ -157,9 +157,18 @@ def test_dashboard_summarises_real_activity(client: TestClient) -> None:
     }
     assert summary["pass_rate"] == 0.75
     assert summary["by_producer"] == {"human": 1, "ai_agent": 4, "bot": 0}
-    assert (summary["daily"][-1]["logged"], summary["daily"][-1]["verified"]) == (5, 4)
+    today = summary["trend"][-1]
+    assert (today["logged"], today["passed"], today["failed"]) == (5, 3, 1)
+    assert summary["kpis"]["changes"] == {"value": 5, "previous": 0, "series": [0] * 6 + [5]}
+    assert summary["kpis"]["verified"]["value"] == 4
+    assert summary["kpis"]["bugs"]["value"] == 1
+    assert summary["kpis"]["memories"]["series"][-1] == 1
     assert len(summary["recent"]) == 5
-    assert len(summary["open_bugs"]) == 1
+    assert [c["status"] for c in summary["active"]] == ["pending"]
+    assert len(summary["runs"]) == 4
+    assert len(summary["open_bugs"]) == len(summary["chains"]) == 1
+    assert len(client.get("/v1/dashboard?days=30", headers=auth).json()["trend"]) == 30
+    assert client.get("/v1/dashboard?days=9", headers=auth).status_code == 422
 
 
 def test_deleting_a_project_removes_its_changes_and_bugs(client: TestClient) -> None:
@@ -185,3 +194,46 @@ def test_timestamps_are_utc_with_an_offset(client: TestClient) -> None:
 
     assert project["created_at"].endswith(("Z", "+00:00"))
     assert me["created_at"].endswith(("Z", "+00:00"))
+
+
+def test_changes_and_bugs_are_numbered_per_user(client: TestClient) -> None:
+    ada = _auth(client)
+    bob = _auth(client, "bob@example.com")
+    first = _change(client, ada, _project(client, ada)["id"])
+    second = _change(client, ada, first["project_id"])
+    bobs = _change(client, bob, _project(client, bob)["id"])
+
+    assert (first["number"], second["number"], bobs["number"]) == (1, 2, 1)
+    numbers = [c["number"] for c in client.get("/v1/changes", headers=ada).json()]
+    assert numbers == [2, 1]
+
+
+def test_dashboard_and_lists_filter_by_project(client: TestClient) -> None:
+    auth = _auth(client)
+    shop = _project(client, auth, "shop")
+    blog = _project(client, auth, "blog")
+    _change(client, auth, shop["id"])
+    _change(client, auth, blog["id"])
+    _change(client, auth, blog["id"])
+
+    summary = client.get(f"/v1/dashboard?project_id={blog['id']}", headers=auth).json()
+    stranger = _auth(client, "eve@example.com")
+
+    assert summary["totals"]["changes"] == 2
+    assert len(client.get(f"/v1/changes?project_id={shop['id']}", headers=auth).json()) == 1
+    assert client.get(f"/v1/dashboard?project_id={blog['id']}", headers=stranger).status_code == 404
+
+
+def test_activity_lists_what_happened_newest_first(client: TestClient) -> None:
+    auth = _auth(client)
+    change = _change(client, auth, _project(client, auth)["id"])
+    client.post(
+        f"/v1/changes/{change['id']}/verdict",
+        json={"verdict": "failed", "bug_title": "Crash on checkout"},
+        headers=auth,
+    )
+
+    kinds = [i["kind"] for i in client.get("/v1/activity", headers=auth).json()]
+
+    assert sorted(kinds) == ["bug_found", "change_logged", "verdict"]
+    assert kinds[-1] == "change_logged"
